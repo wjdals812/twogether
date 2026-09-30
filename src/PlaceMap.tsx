@@ -29,6 +29,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   const [results, setResults] = useState<Place[]>([])
   const [saved, setSaved] = useState<Saved[]>([])
   const [error, setError] = useState('')
+  const [listOpen, setListOpen] = useState(false)
 
   useEffect(() => {
     const m = new naver.maps.Map(el.current!, {
@@ -153,78 +154,115 @@ export default function PlaceMap({ room }: { room: Room }) {
     }
   }
 
+  const panel: React.CSSProperties = {
+    position: 'absolute',
+    background: 'var(--bg)',
+    color: 'var(--text-h)',
+    boxShadow: 'var(--shadow)',
+    textAlign: 'left',
+    zIndex: 10,
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100svh' }}>
-      <div ref={el} style={{ flex: 1 }} />
-      <div style={{ maxHeight: '50svh', overflow: 'auto', padding: 12, textAlign: 'left' }}>
+    <div style={{ position: 'relative', height: '100svh', overflow: 'hidden' }}>
+      <div ref={el} style={{ position: 'absolute', inset: 0 }} />
+
+      <div style={{ ...panel, top: 8, left: 8, right: 8, borderRadius: 12, padding: 8 }}>
         <form onSubmit={search} style={{ display: 'flex', gap: 8 }}>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="장소 검색"
-            style={{ flex: 1, padding: 8 }}
+            style={{ flex: 1, padding: 8, minWidth: 0 }}
           />
           <button>검색</button>
         </form>
-        <p>
-          초대 코드: <b>{room.invite_code}</b> <button onClick={() => supabase.auth.signOut()}>로그아웃</button>
-        </p>
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
-        <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
-          {results.map((p) => (
-            <li key={p.id} style={{ padding: '6px 0' }}>
-              <b>{p.place_name}</b> <small>{p.address_name}</small>{' '}
-              <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>
-            </li>
-          ))}
-        </ul>
-        <h3>저장한 장소 ({saved.length})</h3>
-        <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
-          {saved.map((p) => (
-            <li key={p.kakao_id} style={{ padding: '8px 0', borderTop: '1px solid #8883' }}>
-              <button
-                onClick={() => map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))}
-                style={{ border: 0, background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0 }}
-              >
-                {p.name}
-              </button>{' '}
-              <small>{p.address}</small>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                <button
-                  disabled={isTemp(p)}
-                  onClick={() => patch(p, { status: p.status === 'want' ? 'visited' : 'want' })}
-                  style={{ color: STATUS_COLOR[p.status] }}
-                >
-                  {STATUS_LABEL[p.status]}
-                </button>
-                <select
-                  disabled={isTemp(p)}
-                  value={p.rating ?? ''}
-                  onChange={(e) => patch(p, { rating: e.target.value ? +e.target.value : null })}
-                >
-                  <option value="">별점 없음</option>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {'★'.repeat(n)}
-                    </option>
-                  ))}
-                </select>
-                <button disabled={isTemp(p)} onClick={() => remove(p)}>
-                  삭제
-                </button>
-              </div>
-              <input
-                key={p.memo}
-                defaultValue={p.memo}
-                disabled={isTemp(p)}
-                placeholder="메모"
-                onBlur={(e) => e.target.value !== p.memo && patch(p, { memo: e.target.value })}
-                style={{ width: '100%', boxSizing: 'border-box', padding: 6, marginTop: 4 }}
-              />
-            </li>
-          ))}
-        </ul>
+        {error && <p style={{ color: 'crimson', margin: '8px 0 0' }}>{error}</p>}
+        {results.length > 0 && (
+          <div style={{ maxHeight: '45svh', overflow: 'auto', marginTop: 8 }}>
+            <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
+              {results.map((p) => (
+                <li key={p.id} style={{ padding: '6px 0', borderTop: '1px solid var(--border)' }}>
+                  <b>{p.place_name}</b> <small>{p.address_name}</small>{' '}
+                  <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>
+                </li>
+              ))}
+            </ul>
+            <button onClick={() => setResults([])} style={{ marginTop: 6 }}>
+              검색 결과 닫기
+            </button>
+          </div>
+        )}
       </div>
+
+      {!listOpen && (
+        <button
+          onClick={() => setListOpen(true)}
+          style={{ ...panel, bottom: 16, left: '50%', transform: 'translateX(-50%)', borderRadius: 999, padding: '10px 20px', border: 0, font: 'inherit', fontWeight: 700, cursor: 'pointer' }}
+        >
+          저장한 장소 ({saved.length})
+        </button>
+      )}
+
+      {listOpen && (
+        <div style={{ ...panel, bottom: 0, left: 0, right: 0, maxHeight: '60svh', overflow: 'auto', borderRadius: '16px 16px 0 0', padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ margin: 0 }}>저장한 장소 ({saved.length})</h3>
+            <button onClick={() => setListOpen(false)}>닫기</button>
+          </div>
+          <p style={{ margin: '8px 0' }}>
+            초대 코드: <b>{room.invite_code}</b> <button onClick={() => supabase.auth.signOut()}>로그아웃</button>
+          </p>
+          <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
+            {saved.map((p) => (
+              <li key={p.kakao_id} style={{ padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => {
+                    map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
+                    setListOpen(false)
+                  }}
+                  style={{ border: 0, background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, color: 'inherit' }}
+                >
+                  {p.name}
+                </button>{' '}
+                <small>{p.address}</small>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  <button
+                    disabled={isTemp(p)}
+                    onClick={() => patch(p, { status: p.status === 'want' ? 'visited' : 'want' })}
+                    style={{ color: STATUS_COLOR[p.status] }}
+                  >
+                    {STATUS_LABEL[p.status]}
+                  </button>
+                  <select
+                    disabled={isTemp(p)}
+                    value={p.rating ?? ''}
+                    onChange={(e) => patch(p, { rating: e.target.value ? +e.target.value : null })}
+                  >
+                    <option value="">별점 없음</option>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {'★'.repeat(n)}
+                      </option>
+                    ))}
+                  </select>
+                  <button disabled={isTemp(p)} onClick={() => remove(p)}>
+                    삭제
+                  </button>
+                </div>
+                <input
+                  key={p.memo}
+                  defaultValue={p.memo}
+                  disabled={isTemp(p)}
+                  placeholder="메모"
+                  onBlur={(e) => e.target.value !== p.memo && patch(p, { memo: e.target.value })}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: 6, marginTop: 4 }}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

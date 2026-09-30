@@ -2,6 +2,9 @@
 drop table if exists places cascade;
 drop table if exists room_members cascade;
 drop table if exists rooms cascade;
+drop function if exists is_member(uuid);
+drop function if exists create_room();
+drop function if exists join_room(text);
 
 create table rooms (
   id uuid primary key default gen_random_uuid(),

@@ -1,15 +1,15 @@
 :root {
-  --paper: #f5f6f4;
+  --paper: #f6f7f9;
   --surface: #fff;
-  --ink: #1b2421;
-  --muted: #65706a;
-  --line: #e0e4e0;
-  --field: #eff2ef;
-  --accent: #264e5a;
-  --want: #b8742c;
-  --visited: #3a7d5c;
-  --danger: #b3423a;
-  --shadow: 0 1px 2px rgb(20 30 26 / 0.08), 0 10px 28px rgb(20 30 26 / 0.14);
+  --ink: #1c2430;
+  --muted: #66707f;
+  --line: #e2e6ec;
+  --field: #eef1f5;
+  --accent: #2a6f97;
+  --want: #d4583a;
+  --visited: #2a8a5e;
+  --danger: #c2413b;
+  --shadow: 0 1px 2px rgb(28 36 48 / 0.08), 0 10px 28px rgb(28 36 48 / 0.14);
   --sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
 
@@ -418,13 +418,13 @@ p {
   padding: 0;
   border: 0;
   background: none;
-  color: #ccd2cd;
+  color: #d5dae0;
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
 }
 .stars button.on {
-  color: var(--ink);
+  color: #e3a008;
 }
 .memo {
   min-height: 42px;

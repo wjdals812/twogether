@@ -19,8 +19,9 @@ type Saved = {
 const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
 const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
 const STATUS_COLOR: Record<Status, string> = { want: '#e5484d', visited: '#30a46c' }
+// name + district only (no lot number): short search box text, still tells same-named branches apart
 const naverLink = (name: string, address: string) =>
-  `https://map.naver.com/p/search/${encodeURIComponent(`${name} ${address}`)}`
+  `https://map.naver.com/p/search/${encodeURIComponent(`${name} ${address.split(' ').slice(0, 3).join(' ')}`)}`
 const isTemp = (p: Saved) => p.id.startsWith('tmp:')
 
 export default function PlaceMap({ room }: { room: Room }) {

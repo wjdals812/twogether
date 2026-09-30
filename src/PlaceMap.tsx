@@ -30,6 +30,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   const [saved, setSaved] = useState<Saved[]>([])
   const [error, setError] = useState('')
   const [listOpen, setListOpen] = useState(false)
+  const [selected, setSelected] = useState<string | null>(null)
 
   useEffect(() => {
     const m = new naver.maps.Map(el.current!, {
@@ -37,7 +38,10 @@ export default function PlaceMap({ room }: { room: Room }) {
       zoom: 14,
     })
     map.current = m
-    const click = naver.maps.Event.addListener(m, 'click', () => setResults([]))
+    const click = naver.maps.Event.addListener(m, 'click', () => {
+      setResults([])
+      setSelected(null)
+    })
     return () => {
       naver.maps.Event.removeListener(click)
       m.destroy()
@@ -83,20 +87,34 @@ export default function PlaceMap({ room }: { room: Room }) {
   }, [room.id])
 
   useEffect(() => {
-    markers.current.forEach((m) => m.setMap(null))
-    markers.current = saved.map(
-      (p) =>
-        new naver.maps.Marker({
-          position: new naver.maps.LatLng(p.lat, p.lng),
-          map: map.current!,
-          title: p.name,
-          icon: {
-            content: `<div style="width:16px;height:16px;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 0 3px #0008"></div>`,
-            anchor: new naver.maps.Point(8, 8),
-          },
-        }),
-    )
-  }, [saved])
+    markers.current.forEach((m) => {
+      naver.maps.Event.clearInstanceListeners(m)
+      m.setMap(null)
+    })
+    markers.current = saved.map((p) => {
+      const size = p.kakao_id === selected ? 26 : 16
+      const marker = new naver.maps.Marker({
+        position: new naver.maps.LatLng(p.lat, p.lng),
+        map: map.current!,
+        title: p.name,
+        zIndex: p.kakao_id === selected ? 100 : 1,
+        icon: {
+          content: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 0 3px #0008"></div>`,
+          anchor: new naver.maps.Point(size / 2 + 2, size / 2 + 2),
+        },
+      })
+      naver.maps.Event.addListener(marker, 'click', () => {
+        setSelected(p.kakao_id)
+        setListOpen(true)
+      })
+      return marker
+    })
+  }, [saved, selected])
+
+  // bring the selected place into view inside the open sheet
+  useEffect(() => {
+    if (listOpen && selected) document.getElementById(`place-${selected}`)?.scrollIntoView({ block: 'center' })
+  }, [listOpen, selected])
 
   async function search(e: React.FormEvent) {
     e.preventDefault()
@@ -219,10 +237,20 @@ export default function PlaceMap({ room }: { room: Room }) {
           </p>
           <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
             {saved.map((p) => (
-              <li key={p.kakao_id} style={{ padding: '8px 0', borderTop: '1px solid var(--border)' }}>
+              <li
+                key={p.kakao_id}
+                id={`place-${p.kakao_id}`}
+                style={{
+                  padding: '8px 6px',
+                  borderTop: '1px solid var(--border)',
+                  background: p.kakao_id === selected ? 'var(--accent-bg)' : undefined,
+                  borderRadius: 6,
+                }}
+              >
                 <button
                   onClick={() => {
                     map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
+                    setSelected(p.kakao_id)
                     setListOpen(false)
                   }}
                   style={{ border: 0, background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, color: 'inherit' }}

@@ -168,8 +168,8 @@ export default function PlaceMap({ room }: { room: Room }) {
   }
 
   return (
-    <div style={{ position: 'relative', height: '100svh', overflow: 'hidden' }}>
-      <div ref={el} style={{ position: 'absolute', inset: 0 }} />
+    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+      <div ref={el} style={{ position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' }} />
 
       <div style={{ ...panel, top: 8, left: 8, right: 8, borderRadius: 12, padding: 8 }}>
         <form onSubmit={search} style={{ display: 'flex', gap: 8 }}>

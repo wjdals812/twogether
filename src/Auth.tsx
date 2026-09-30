@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Brand from './Brand'
 import { supabase } from './supabase'
 
 export default function Auth() {
@@ -16,27 +17,42 @@ export default function Auth() {
   }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        submit(false)
-      }}
-      style={{ display: 'grid', gap: 8, maxWidth: 320, margin: '20vh auto', padding: 16 }}
-    >
-      <h2>twogether</h2>
-      <input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      <input
-        type="password"
-        placeholder="비밀번호 (6자 이상)"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-      <button>로그인</button>
-      <button type="button" onClick={() => submit(true)}>
-        회원가입
-      </button>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-    </form>
+    <main className="screen">
+      <form
+        className="card"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit(false)
+        }}
+      >
+        <Brand />
+        <p className="tagline">함께 채우는 장소 지도</p>
+        <div className="stack">
+          <input
+            className="field"
+            type="email"
+            placeholder="이메일"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            className="field"
+            type="password"
+            placeholder="비밀번호 (6자 이상)"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error && <p className="error">{error}</p>}
+          <button className="btn btn-primary">로그인</button>
+          <button className="btn btn-ghost" type="button" onClick={() => submit(true)}>
+            회원가입
+          </button>
+        </div>
+      </form>
+    </main>
   )
 }

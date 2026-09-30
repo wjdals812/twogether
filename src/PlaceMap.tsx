@@ -18,7 +18,7 @@ type Saved = {
 
 const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
 const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
-const STATUS_COLOR: Record<Status, string> = { want: '#e5484d', visited: '#30a46c' }
+const STATUS_COLOR: Record<Status, string> = { want: '#b8742c', visited: '#3a7d5c' } // keep in sync with --want / --visited in index.css
 // name only in the search box, the place's coordinates as map center so nearby matches rank first
 const naverLink = (name: string, lat: number, lng: number) =>
   `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=16.00,${lng},${lat},0,0,0,dh`
@@ -34,6 +34,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   const [error, setError] = useState('')
   const searchCache = useRef(new Map<string, Place[]>())
   const [listOpen, setListOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
 
   useEffect(() => {
@@ -108,15 +109,15 @@ export default function PlaceMap({ room }: { room: Room }) {
       m.setMap(null)
     })
     markers.current = saved.map((p) => {
-      const size = p.kakao_id === selected ? 26 : 16
+      const size = p.kakao_id === selected ? 28 : 20
       const marker = new naver.maps.Marker({
         position: new naver.maps.LatLng(p.lat, p.lng),
         map: map.current!,
         title: p.name,
         zIndex: p.kakao_id === selected ? 100 : 1,
         icon: {
-          content: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 0 3px #0008"></div>`,
-          anchor: new naver.maps.Point(size / 2 + 2, size / 2 + 2),
+          content: `<div style="width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:3px solid #fff;box-shadow:0 1px 4px rgb(20 30 26 / .45)"></div>`,
+          anchor: new naver.maps.Point(size / 2, size / 2),
         },
       })
       naver.maps.Event.addListener(marker, 'click', () => {
@@ -217,149 +218,210 @@ export default function PlaceMap({ room }: { room: Room }) {
     }
   }
 
-  const panel: React.CSSProperties = {
-    position: 'absolute',
-    background: 'var(--bg)',
-    color: 'var(--text-h)',
-    boxShadow: 'var(--shadow)',
-    textAlign: 'left',
-    zIndex: 10,
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(room.invite_code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setError('복사하지 못했습니다. 코드를 직접 선택해 주세요.')
+    }
   }
+
+  const wantCount = saved.filter((p) => p.status === 'want').length
+  const visitedCount = saved.length - wantCount
 
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
       <div ref={el} style={{ position: 'absolute', inset: 0, zIndex: 0, isolation: 'isolate' }} />
 
-      <div style={{ ...panel, top: 8, left: 8, right: 8, borderRadius: 12, padding: 8 }}>
-        <form onSubmit={search} style={{ display: 'flex', gap: 8 }}>
+      <div className="panel search">
+        <form className="search-row" onSubmit={search} role="search">
+          <Icon d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm9 16-3.5-3.5" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="장소 검색"
-            style={{ flex: 1, padding: 8, minWidth: 0 }}
+            placeholder="장소 이름으로 검색"
+            aria-label="장소 검색"
+            enterKeyHint="search"
           />
-          <button>검색</button>
+          {query && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon"
+              aria-label="검색어 지우기"
+              onClick={() => {
+                setQuery('')
+                setResults([])
+              }}
+            >
+              <Icon d="M6 6l12 12M18 6 6 18" />
+            </button>
+          )}
         </form>
-        {error && <p style={{ color: 'crimson', margin: '8px 0 0' }}>{error}</p>}
+        {error && <p className="error">{error}</p>}
         {results.length > 0 && (
-          <div style={{ maxHeight: '40svh', overflow: 'auto', marginTop: 8 }}>
-            <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
+          <>
+            <ul className="results">
               {results.map((p) => (
-                <li
-                  key={p.id}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid var(--border)' }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <b>{p.place_name}</b>
-                    <small style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.address_name}
-                    </small>
+                <li className="result" key={p.id}>
+                  <div className="result-text">
+                    <span className="result-name">{p.place_name}</span>
+                    <span className="result-addr">{p.address_name}</span>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>
+                  <div className="result-side">
+                    {saved.some((s) => s.kakao_id === p.id) ? (
+                      <button className="btn btn-sm" disabled>
+                        추가됨
+                      </button>
+                    ) : (
+                      <button className="btn btn-sm btn-primary" onClick={() => add(p)}>
+                        추가
+                      </button>
+                    )}
                     <a href={naverLink(p.place_name, +p.y, +p.x)} target="_blank" rel="noopener noreferrer">
-                      <small>네이버 지도</small>
+                      네이버 지도 ↗
                     </a>
                   </div>
                 </li>
               ))}
             </ul>
-            <button onClick={() => setResults([])} style={{ marginTop: 6 }}>
-              검색 결과 닫기
+            <button className="btn btn-ghost btn-sm results-close" onClick={() => setResults([])}>
+              결과 닫기
             </button>
-          </div>
+          </>
         )}
       </div>
 
       {!listOpen && (
         <button
+          className="panel dock"
           onClick={() => setListOpen(true)}
-          style={{ ...panel, bottom: 16, left: '50%', transform: 'translateX(-50%)', borderRadius: 999, padding: '10px 20px', border: 0, font: 'inherit', fontWeight: 700, cursor: 'pointer' }}
+          aria-label={`저장한 장소 열기. 가고 싶어요 ${wantCount}곳, 다녀왔어요 ${visitedCount}곳`}
         >
-          저장한 장소 ({saved.length})
+          저장한 장소
+          <span className="dock-count">
+            <span className="dot want" />
+            {wantCount}
+          </span>
+          <span className="dock-count">
+            <span className="dot visited" />
+            {visitedCount}
+          </span>
         </button>
       )}
 
       {listOpen && (
-        <div style={{ ...panel, bottom: 0, left: 0, right: 0, maxHeight: '60svh', overflow: 'auto', borderRadius: '16px 16px 0 0', padding: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <h3 style={{ margin: 0 }}>저장한 장소 ({saved.length})</h3>
-            <span style={{ display: 'flex', gap: 8 }}>
-              <button onClick={load}>새로고침</button>
-              <button onClick={() => setListOpen(false)}>닫기</button>
-            </span>
+        <section className="panel sheet" aria-label="저장한 장소">
+          <div className="sheet-head">
+            <h2>
+              저장한 장소<span>{saved.length}</span>
+            </h2>
+            <div>
+              <button className="btn btn-ghost btn-icon" aria-label="새로고침" onClick={load}>
+                <Icon d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
+              </button>
+              <button className="btn btn-ghost btn-icon" aria-label="닫기" onClick={() => setListOpen(false)}>
+                <Icon d="M6 6l12 12M18 6 6 18" />
+              </button>
+            </div>
           </div>
-          <p style={{ margin: '8px 0' }}>
-            초대 코드: <b>{room.invite_code}</b> <button onClick={() => supabase.auth.signOut()}>로그아웃</button>
-          </p>
-          <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
-            {saved.map((p) => (
-              <li
-                key={p.kakao_id}
-                id={`place-${p.kakao_id}`}
-                style={{
-                  padding: '8px 6px',
-                  borderTop: '1px solid var(--border)',
-                  background: p.kakao_id === selected ? 'var(--accent-bg)' : undefined,
-                  borderRadius: 6,
-                }}
-              >
-                <button
-                  onClick={() => {
-                    map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
-                    setSelected(p.kakao_id)
-                    setListOpen(false)
-                  }}
-                  style={{ border: 0, background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0, color: 'inherit' }}
-                >
-                  {p.name}
-                </button>{' '}
-                <small>{p.address}</small>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                  <button
-                    disabled={isTemp(p)}
-                    onClick={() => patch(p, { status: p.status === 'want' ? 'visited' : 'want' })}
-                    style={{ color: STATUS_COLOR[p.status] }}
+          <div className="sheet-body">
+            <div className="invite">
+              <span>
+                초대 코드<b>{room.invite_code}</b>
+              </span>
+              <button className="btn btn-sm" onClick={copyCode}>
+                {copied ? '복사됨' : '복사'}
+              </button>
+            </div>
+            {saved.length === 0 ? (
+              <p className="empty">저장한 장소가 없습니다. 위 검색창에서 장소를 찾아 추가해 보세요.</p>
+            ) : (
+              <ul className="list">
+                {saved.map((p) => (
+                  <li
+                    key={p.kakao_id}
+                    id={`place-${p.kakao_id}`}
+                    className={p.kakao_id === selected ? 'place selected' : 'place'}
                   >
-                    {STATUS_LABEL[p.status]}
-                  </button>
-                  <select
-                    disabled={isTemp(p)}
-                    value={p.rating ?? ''}
-                    onChange={(e) => patch(p, { rating: e.target.value ? +e.target.value : null })}
-                  >
-                    <option value="">별점 없음</option>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>
-                        {'★'.repeat(n)}
-                      </option>
-                    ))}
-                  </select>
-                  <a
-                    href={naverLink(p.name, p.lat, p.lng)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ alignSelf: 'center' }}
-                  >
-                    네이버 지도에서 보기
-                  </a>
-                  <button disabled={isTemp(p)} onClick={() => remove(p)}>
-                    삭제
-                  </button>
-                </div>
-                <input
-                  key={p.memo}
-                  defaultValue={p.memo}
-                  disabled={isTemp(p)}
-                  placeholder="메모"
-                  onBlur={(e) => e.target.value !== p.memo && patch(p, { memo: e.target.value })}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: 6, marginTop: 4 }}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
+                    <button
+                      className="place-name"
+                      onClick={() => {
+                        map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
+                        setSelected(p.kakao_id)
+                        setListOpen(false)
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                    <span className="place-addr">{p.address}</span>
+                    <div className="place-tools">
+                      <div className="seg" role="group" aria-label="상태">
+                        {(['want', 'visited'] as Status[]).map((st) => (
+                          <button
+                            key={st}
+                            disabled={isTemp(p)}
+                            className={p.status === st ? `on ${st}` : undefined}
+                            aria-pressed={p.status === st}
+                            onClick={() => p.status !== st && patch(p, { status: st })}
+                          >
+                            {STATUS_LABEL[st]}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="stars" role="group" aria-label="별점">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button
+                            key={n}
+                            disabled={isTemp(p)}
+                            className={p.rating !== null && n <= p.rating ? 'on' : undefined}
+                            aria-label={`${n}점`}
+                            aria-pressed={p.rating === n}
+                            onClick={() => patch(p, { rating: p.rating === n ? null : n })}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      key={p.memo}
+                      className="field memo"
+                      defaultValue={p.memo}
+                      disabled={isTemp(p)}
+                      placeholder="메모"
+                      aria-label={`${p.name} 메모`}
+                      onBlur={(e) => e.target.value !== p.memo && patch(p, { memo: e.target.value })}
+                    />
+                    <div className="place-foot">
+                      <a href={naverLink(p.name, p.lat, p.lng)} target="_blank" rel="noopener noreferrer">
+                        네이버 지도에서 보기 ↗
+                      </a>
+                      <button className="btn btn-ghost btn-sm danger" disabled={isTemp(p)} onClick={() => remove(p)}>
+                        삭제
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="sheet-foot">
+              <button className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>
+                로그아웃
+              </button>
+            </div>
+          </div>
+        </section>
       )}
     </div>
+  )
+}
+
+function Icon({ d }: { d: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
   )
 }

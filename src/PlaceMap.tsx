@@ -32,6 +32,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   const [results, setResults] = useState<Place[]>([])
   const [saved, setSaved] = useState<Saved[]>([])
   const [error, setError] = useState('')
+  const searchCache = useRef(new Map<string, Place[]>())
   const [listOpen, setListOpen] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -135,17 +136,21 @@ export default function PlaceMap({ room }: { room: Room }) {
   useEffect(() => {
     const q = query.trim()
     if (q.length < 2) return setResults([])
+    const cached = searchCache.current.get(q)
+    if (cached) return setResults(cached)
     const ctrl = new AbortController()
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?query=${encodeURIComponent(q)}`, { signal: ctrl.signal })
         if (!res.ok) return setError(`검색 실패 (${res.status})`)
         setError('')
-        setResults((await res.json()).documents)
+        const documents: Place[] = (await res.json()).documents
+        searchCache.current.set(q, documents)
+        setResults(documents)
       } catch (e) {
         if ((e as Error).name !== 'AbortError') setError('검색 실패')
       }
-    }, 300)
+    }, 200)
     return () => {
       clearTimeout(timer)
       ctrl.abort()

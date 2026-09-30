@@ -37,7 +37,11 @@ export default function PlaceMap({ room }: { room: Room }) {
       zoom: 14,
     })
     map.current = m
-    return () => m.destroy()
+    const click = naver.maps.Event.addListener(m, 'click', () => setResults([]))
+    return () => {
+      naver.maps.Event.removeListener(click)
+      m.destroy()
+    }
   }, [])
 
   // insert/update: replace the row with the same kakao_id (also swaps the optimistic temp row for the real one)

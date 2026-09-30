@@ -68,7 +68,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   async function search(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const res = await fetch(`/api/kakao/v2/local/search/keyword.json?query=${encodeURIComponent(query)}`)
+    const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`)
     if (!res.ok) return setError(`검색 실패 (${res.status})`)
     setResults((await res.json()).documents)
   }

@@ -8,11 +8,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       proxy: {
-        // ponytail: dev-only proxy, swap for a serverless function when deploying
-        '/api/kakao': {
+        // dev-only mirror of api/search.ts (Vercel function in production)
+        '/api/search': {
           target: 'https://dapi.kakao.com',
           changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/api\/kakao/, ''),
+          rewrite: (p) => p.replace('/api/search', '/v2/local/search/keyword.json'),
           headers: { Authorization: `KakaoAK ${env.KAKAO_REST_API_KEY}` },
         },
       },

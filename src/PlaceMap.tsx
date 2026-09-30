@@ -19,9 +19,9 @@ type Saved = {
 const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
 const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
 const STATUS_COLOR: Record<Status, string> = { want: '#e5484d', visited: '#30a46c' }
-// name + district only (no lot number): short search box text, still tells same-named branches apart
-const naverLink = (name: string, address: string) =>
-  `https://map.naver.com/p/search/${encodeURIComponent(`${name} ${address.split(' ').slice(0, 3).join(' ')}`)}`
+// name only in the search box, the place's coordinates as map center so nearby matches rank first
+const naverLink = (name: string, lat: number, lng: number) =>
+  `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=16.00,${lng},${lat},0,0,0,dh`
 const isTemp = (p: Saved) => p.id.startsWith('tmp:')
 
 export default function PlaceMap({ room }: { room: Room }) {
@@ -210,7 +210,7 @@ export default function PlaceMap({ room }: { room: Room }) {
                 <li key={p.id} style={{ padding: '6px 0', borderTop: '1px solid var(--border)' }}>
                   <b>{p.place_name}</b> <small>{p.address_name}</small>{' '}
                   <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>{' '}
-                  <a href={naverLink(p.place_name, p.address_name)} target="_blank" rel="noopener noreferrer">
+                  <a href={naverLink(p.place_name, +p.y, +p.x)} target="_blank" rel="noopener noreferrer">
                     네이버 지도
                   </a>
                 </li>
@@ -285,7 +285,7 @@ export default function PlaceMap({ room }: { room: Room }) {
                     ))}
                   </select>
                   <a
-                    href={naverLink(p.name, p.address)}
+                    href={naverLink(p.name, p.lat, p.lng)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ alignSelf: 'center' }}

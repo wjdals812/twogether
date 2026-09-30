@@ -67,6 +67,12 @@
 - Realtime: `places` 변경을 구독(`room_id` 필터). 내 저장이 성공해도 이벤트가 돌아오므로 `kakao_id` 기준으로 중복을 합친다. 저장 실패 시 롤백하되, 이미 같은 장소가 있어 생긴 unique 위반(23505)은 롤백하지 않는다.
 - 시크릿 창으로 두 계정을 만들어 한쪽 추가가 다른 쪽에 새로고침 없이 뜨는 것을 확인.
 
+### 5. 배포 준비와 Vercel 연결
+- 카카오 검색 호출을 개발 서버 프록시에서 Vercel 함수([api/search.ts](../api/search.ts))로 옮겼다. query만 받아 키워드 검색 한 경로만 호출하고, 카카오 REST 키는 서버 환경 변수에서 읽는다. 개발 서버에서는 같은 주소(/api/search)를 Vite 프록시가 처리한다.
+- GitHub 비공개 저장소(wjdals812/twogether)에 푸시. 저장소가 이미 공개 상태로 있어서 비공개로 전환한 뒤 올렸다.
+- Vercel에서 저장소 Import. 비공개 저장소는 URL 입력으로는 접근이 안 되고 GitHub 앱 권한에서 저장소를 허용해야 했다.
+- 환경 변수 4개(VITE_NAVER_MAP_CLIENT_ID, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, KAKAO_REST_API_KEY)를 Vercel에 등록.
+
 ## 파일 구성
 
 - [src/App.tsx](../src/App.tsx): 세션과 방 상태에 따라 Auth, RoomGate, PlaceMap 중 하나를 보여준다.
@@ -87,7 +93,7 @@
 
 ## 알려진 한계와 다음 할 일
 
-- 카카오 프록시가 Vite 개발 서버에서만 동작한다. 배포하려면 Vercel 함수로 교체해야 한다.
+- 카카오 검색 함수(api/search.ts)가 인증 없이 호출된다. 남용되면 Supabase 로그인 토큰 검증을 추가해야 한다.
 - 방 나가기, 삭제, 방 이동이 없다. 장소 삭제와 수정도 없다.
 - 다녀왔어요 상태, 메모, 별점, 카테고리 필터가 없다.
 - 모바일 UI(바텀시트, 마커와 목록 연동)와 PWA가 없다.

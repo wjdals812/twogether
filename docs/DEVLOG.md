@@ -14,7 +14,8 @@
 | Supabase 대시보드 | 프로젝트, SQL Editor, Authentication, API 키 | https://supabase.com/dashboard |
 | Supabase 문서 | RLS, Realtime, Auth | https://supabase.com/docs |
 | Vite | 빌드 도구, 프록시, 환경 변수 | https://vite.dev |
-| Vercel | 배포 예정 | https://vercel.com |
+| Vercel | 배포, 환경 변수 | https://vercel.com |
+| 배포 사이트 | 실제 서비스 주소 | https://twogether-three.vercel.app |
 
 ## 구조
 
@@ -24,12 +25,14 @@
 | 지도 표시 | 네이버 Dynamic Map |
 | 장소 검색 | 카카오 로컬 API (키워드 검색) |
 | DB / 인증 / 실시간 | Supabase (Postgres, Auth, Realtime, RLS) |
-| 검색 API 키 보호 | Vite 개발 서버 프록시 (배포 시 Vercel 함수로 교체 예정) |
+| 검색 API 키 보호 | Vercel 함수(api/search.ts), 개발 중에는 같은 주소를 Vite 프록시가 처리 |
+| 배포 | GitHub(비공개) → Vercel 자동 배포 |
+| 앱 설치 | PWA (홈 화면에 추가) |
 
 ```
 브라우저 ──> 네이버 지도 (Client ID, 공개 가능)
    │
-   ├──> /api/kakao ──(Vite 프록시, 서버에서 REST 키 추가)──> 카카오 로컬 API
+   ├──> /api/search ──(Vercel 함수, 서버에서 REST 키 추가)──> 카카오 로컬 API
    │
    └──> Supabase (공개 anon 키 + 로그인 토큰, RLS로 방 단위 접근 제한)
 ```
@@ -72,17 +75,52 @@
 - GitHub 비공개 저장소(wjdals812/twogether)에 푸시. 저장소가 이미 공개 상태로 있어서 비공개로 전환한 뒤 올렸다.
 - Vercel에서 저장소 Import. 비공개 저장소는 URL 입력으로는 접근이 안 되고 GitHub 앱 권한에서 저장소를 허용해야 했다.
 - 환경 변수 4개(VITE_NAVER_MAP_CLIENT_ID, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, KAKAO_REST_API_KEY)를 Vercel에 등록.
+- **문제:** Import 직후 배포가 시작되지 않았다(No Production Deployment). GitHub 쪽 배포와 빌드 상태를 조회해 보니 Vercel이 만든 것이 하나도 없었다. 새 커밋을 푸시하자 웹훅이 동작해 빌드가 시작되었다.
+- 배포 주소를 네이버 클라우드 콘솔의 Web 서비스 URL과 Supabase의 Site URL, Redirect URLs에 추가했다. localhost 주소도 Redirect URLs에 남겨 로컬 개발이 막히지 않게 했다.
+- 이후 main에 푸시하면 자동으로 배포된다. 배포 후에는 번들 파일 이름이 로컬 빌드와 같은지 비교해 새 코드가 반영됐는지 확인했다.
+
+### 6. 편의 기능: 상태, 메모, 별점, 삭제
+- places에 status(want/visited), memo, rating(1~5) 컬럼 추가. 기존 DB는 [supabase/migrations/002_place_details.sql](../supabase/migrations/002_place_details.sql)로 변경하고 schema.sql에도 반영.
+- 상태 토글, 별점 선택, 메모 입력(포커스를 잃을 때 저장), 삭제(확인창). 마커 색은 상태별로 구분(가고 싶어요 빨강, 다녀왔어요 초록).
+- 추가, 수정, 삭제 모두 화면에 먼저 반영하고 실패하면 되돌리는 낙관적 업데이트. 추가 중인 임시 행은 실제 행이 오기 전까지 수정과 삭제를 막는다.
+- 실시간: UPDATE, DELETE도 구독. DELETE 이벤트는 삭제된 행의 id만 오고 방 필터를 쓸 수 없어서, 화면에 가진 id만 제거하는 방식으로 처리했다.
+- **문제:** schema.sql을 다시 실행하자 `function is_member already exists` 오류가 났다. 테이블만 지우고 함수는 지우지 않았기 때문이다. 함수도 먼저 drop하도록 고쳤다. 또 이 스크립트는 rooms와 room_members까지 지우므로, 컬럼 추가처럼 데이터를 보존해야 하는 변경은 마이그레이션 파일로 분리했다.
+
+### 7. 모바일 화면과 PWA
+- 지도를 전체 화면으로 깔고, 위쪽에 검색창, 아래쪽에 "저장한 장소 (n)" 버튼을 두었다. 버튼을 누르면 아래에서 시트가 올라와 목록(상태, 별점, 메모, 초대 코드, 로그아웃)을 보여준다. 지도 빈 곳을 누르면 검색 결과가 닫힌다.
+- 마커를 누르면 시트가 열리고 해당 장소가 강조되며 그 위치로 스크롤된다. 선택된 마커는 더 크게 그린다.
+- PWA: manifest, 아이콘(192, 512, 애플 터치 180), theme-color 추가. 아이콘은 스크립트로 직접 그린 임시 디자인이다. 서비스 워커는 넣지 않았다. 실시간 동기화 앱이라 오프라인 이점이 적고, 이전 버전이 캐시에 남는 문제를 피하기 위해서다. 아이폰 Safari에서 홈 화면 추가와 실행을 확인했다.
+- **문제:** 아이폰에서 검색창과 저장 버튼이 보이지 않았다. 원인을 하나로 확정하지 못해 두 가지를 함께 막았다. 전체 컨테이너를 100svh 대신 position: fixed, inset: 0으로 바꿔 뷰포트 높이 단위 차이에 의존하지 않게 했고, 지도 컨테이너에 독립된 쌓임 맥락(z-index 0, isolation)을 만들어 지도 내부 요소가 패널을 덮지 못하게 했다. 이후 정상 표시되는 것을 확인했다.
+
+### 8. 네이버 지도로 이동
+- 네이버 장소 상세(사진, 영업시간, 리뷰)는 공개 API가 없고 크롤링은 약관 위반이라 앱 안에 직접 보여주지 않고 링크로 넘긴다. 카카오와 네이버의 장소 ID가 달라 ID로 연결할 방법이 없어, 검색 주소를 만들어 여는 방식을 택했다.
+- 검색창에 이름과 주소가 길게 들어가는 문제가 있었다. 검색어는 이름만 쓰고, 저장된 좌표를 지도 중심(`c=확대,경도,위도,...`)으로 넘기는 방식으로 바꾸자 깔끔해졌고 원하는 지점이 먼저 나오는 것을 확인했다. 이 주소 형식은 공식 문서로 확인한 것이 아니라 실제 동작으로 확인한 것이라, 네이버가 형식을 바꾸면 깨질 수 있다.
+
+## 문제 해결 기록
+
+| 상황 | 원인 | 해결 |
+|---|---|---|
+| 네이버 개발자센터에 검색 API가 없음 | 검색 API가 NAVER API HUB로 이전, 신규 신청 불가 | 검색만 카카오 로컬 API로 교체 |
+| 공개 저장소 상태로 만들어져 있음 | 미리 만든 빈 저장소가 공개였음 | 비공개로 전환 후 푸시 |
+| Vercel에서 비공개 저장소 접근 불가 | URL 입력 방식은 공개 저장소용 | GitHub 앱 권한에서 저장소 허용 후 Import |
+| Import 후 배포가 시작되지 않음 | 웹훅이 동작하지 않음 | 새 커밋 푸시로 빌드 시작 |
+| schema.sql 재실행 시 함수 중복 오류 | 함수를 drop하지 않음 | drop function 추가, 컬럼 추가는 마이그레이션 분리 |
+| 수정 요청이 `Failed to fetch`(CORS, PATCH 불허)로 실패 | 서버는 정상 응답. 같은 헤더로 사전 요청을 재현하면 PATCH 허용. 시크릿 창에서는 정상이라 브라우저 쪽 문제로 좁힘 | 브라우저 재시작 후 해결. 앱 코드 변경 없음 |
+| 아이폰에서 검색창과 버튼이 안 보임 | 뷰포트 단위나 겹침 순서 문제로 추정 | fixed 컨테이너와 독립 쌓임 맥락 |
 
 ## 파일 구성
 
 - [src/App.tsx](../src/App.tsx): 세션과 방 상태에 따라 Auth, RoomGate, PlaceMap 중 하나를 보여준다.
 - [src/Auth.tsx](../src/Auth.tsx): 로그인, 회원가입.
 - [src/RoomGate.tsx](../src/RoomGate.tsx): 방 만들기, 초대 코드 입장.
-- [src/PlaceMap.tsx](../src/PlaceMap.tsx): 지도, 검색, 저장, 실시간 구독.
+- [src/PlaceMap.tsx](../src/PlaceMap.tsx): 지도, 검색, 저장, 수정, 삭제, 실시간 구독, 시트 화면.
 - [src/supabase.ts](../src/supabase.ts): Supabase 클라이언트.
-- [supabase/schema.sql](../supabase/schema.sql): 스키마와 RLS. 다시 실행하면 `places` 데이터가 지워진다(개발용).
+- [api/search.ts](../api/search.ts): 카카오 검색을 대신 호출하는 Vercel 함수.
+- [supabase/schema.sql](../supabase/schema.sql): 전체 스키마와 RLS. 다시 실행하면 places, rooms, room_members 데이터가 모두 지워진다(개발용).
+- [supabase/migrations/](../supabase/migrations/): 데이터를 보존하는 변경.
+- [public/manifest.webmanifest](../public/manifest.webmanifest): PWA 설정.
 
-## 환경 변수 (`.env.local`, 커밋 안 됨)
+## 환경 변수 (`.env.local`과 Vercel, 커밋 안 됨)
 
 | 변수 | 공개 여부 |
 |---|---|
@@ -94,8 +132,9 @@
 ## 알려진 한계와 다음 할 일
 
 - 카카오 검색 함수(api/search.ts)가 인증 없이 호출된다. 남용되면 Supabase 로그인 토큰 검증을 추가해야 한다.
-- 방 나가기, 삭제, 방 이동이 없다. 장소 삭제와 수정도 없다.
-- 다녀왔어요 상태, 메모, 별점, 카테고리 필터가 없다.
-- 모바일 UI(바텀시트, 마커와 목록 연동)와 PWA가 없다.
+- 방 나가기와 방 이동이 없다. 사용자당 방 1개로 제한되어 있다.
+- 카테고리 필터가 없다. 카카오 검색 응답에 카테고리와 전화번호가 있지만 저장하지 않는다.
+- 시트를 손가락으로 끌어 올리고 내리는 동작이 없다(버튼으로만 열고 닫는다).
+- 네이버 지도 링크는 주소 형식(`c=...`)을 공식 문서로 확인하지 못했다. 네이버가 바꾸면 깨질 수 있다.
 - 테스트와 CI가 없다.
-- 포트폴리오용 README(화면 GIF, 구조 그림, 기술 선택 이유)가 아직 없다. 위의 "문제 → 결정" 항목들(검색 API 이전, 키 노출 방지, 정원 동시성, 실시간 중복)을 글로 풀어 쓰면 된다.
+- 포트폴리오용 README(화면 GIF, 구조 그림, 기술 선택 이유)가 아직 없다. 위 "문제 해결 기록"의 항목들(검색 API 이전, 키 노출 방지, 정원 동시성, 실시간 중복, 낙관적 업데이트와 롤백)을 글로 풀어 쓰면 된다.

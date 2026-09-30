@@ -59,16 +59,22 @@ export default function PlaceMap({ room }: { room: Room }) {
         : [...prev, r],
     )
 
-  useEffect(() => {
-    supabase
+  async function load() {
+    const { data, error } = await supabase
       .from('places')
       .select(COLUMNS)
       .eq('room_id', room.id)
       .order('created_at')
-      .then(({ data, error }) => {
-        if (error) return setError(`불러오기 실패: ${error.message}`)
-        data.forEach(merge)
-      })
+    if (error) return setError(`불러오기 실패: ${error.message}`)
+    // replace with the server state (drops rows deleted elsewhere) but keep rows still being added
+    setSaved((prev) => [
+      ...data,
+      ...prev.filter((p) => isTemp(p) && !data.some((d) => d.kakao_id === p.kakao_id)),
+    ])
+  }
+
+  useEffect(() => {
+    load()
 
     const table = { schema: 'public', table: 'places' }
     const channel = supabase
@@ -83,8 +89,14 @@ export default function PlaceMap({ room }: { room: Room }) {
       .on('postgres_changes', { event: 'DELETE', ...table }, (e) =>
         setSaved((prev) => prev.filter((p) => p.id !== e.old.id)),
       )
-      .subscribe()
+      // events missed while disconnected (iOS suspends background apps) are not replayed, so reload on (re)connect
+      .subscribe((status) => status === 'SUBSCRIBED' && load())
+    const onVisible = () => document.visibilityState === 'visible' && load()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', load)
     return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', load)
       supabase.removeChannel(channel)
     }
   }, [room.id])
@@ -236,7 +248,10 @@ export default function PlaceMap({ room }: { room: Room }) {
         <div style={{ ...panel, bottom: 0, left: 0, right: 0, maxHeight: '60svh', overflow: 'auto', borderRadius: '16px 16px 0 0', padding: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <h3 style={{ margin: 0 }}>저장한 장소 ({saved.length})</h3>
-            <button onClick={() => setListOpen(false)}>닫기</button>
+            <span style={{ display: 'flex', gap: 8 }}>
+              <button onClick={load}>새로고침</button>
+              <button onClick={() => setListOpen(false)}>닫기</button>
+            </span>
           </div>
           <p style={{ margin: '8px 0' }}>
             초대 코드: <b>{room.invite_code}</b> <button onClick={() => supabase.auth.signOut()}>로그아웃</button>

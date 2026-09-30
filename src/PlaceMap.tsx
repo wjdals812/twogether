@@ -2,16 +2,24 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import type { Room } from './RoomGate'
 
-type Row = { kakao_id: string; name: string; address: string; lat: number; lng: number }
 type Place = { id: string; place_name: string; address_name: string; x: string; y: string }
+type Status = 'want' | 'visited'
+type Saved = {
+  id: string
+  kakao_id: string
+  name: string
+  address: string
+  lat: number
+  lng: number
+  status: Status
+  memo: string
+  rating: number | null
+}
 
-const toPlace = (r: Row): Place => ({
-  id: r.kakao_id,
-  place_name: r.name,
-  address_name: r.address,
-  x: String(r.lng),
-  y: String(r.lat),
-})
+const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
+const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
+const STATUS_COLOR: Record<Status, string> = { want: '#e5484d', visited: '#30a46c' }
+const isTemp = (p: Saved) => p.id.startsWith('tmp:')
 
 export default function PlaceMap({ room }: { room: Room }) {
   const el = useRef<HTMLDivElement>(null)
@@ -19,7 +27,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   const markers = useRef<naver.maps.Marker[]>([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Place[]>([])
-  const [saved, setSaved] = useState<Place[]>([])
+  const [saved, setSaved] = useState<Saved[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -31,13 +39,18 @@ export default function PlaceMap({ room }: { room: Room }) {
     return () => m.destroy()
   }, [])
 
-  useEffect(() => {
-    const merge = (r: Row) =>
-      setSaved((prev) => (prev.some((p) => p.id === r.kakao_id) ? prev : [...prev, toPlace(r)]))
+  // insert/update: replace the row with the same kakao_id (also swaps the optimistic temp row for the real one)
+  const merge = (r: Saved) =>
+    setSaved((prev) =>
+      prev.some((p) => p.kakao_id === r.kakao_id)
+        ? prev.map((p) => (p.kakao_id === r.kakao_id ? r : p))
+        : [...prev, r],
+    )
 
+  useEffect(() => {
     supabase
       .from('places')
-      .select('kakao_id, name, address, lat, lng')
+      .select(COLUMNS)
       .eq('room_id', room.id)
       .order('created_at')
       .then(({ data, error }) => {
@@ -45,12 +58,18 @@ export default function PlaceMap({ room }: { room: Room }) {
         data.forEach(merge)
       })
 
+    const table = { schema: 'public', table: 'places' }
     const channel = supabase
       .channel(`places:${room.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'places', filter: `room_id=eq.${room.id}` },
-        (payload) => merge(payload.new as Row),
+      .on('postgres_changes', { event: 'INSERT', ...table, filter: `room_id=eq.${room.id}` }, (e) =>
+        merge(e.new as Saved),
+      )
+      .on('postgres_changes', { event: 'UPDATE', ...table, filter: `room_id=eq.${room.id}` }, (e) =>
+        merge(e.new as Saved),
+      )
+      // DELETE events can't be filtered by room (old row only carries the id), but we only drop ids we hold
+      .on('postgres_changes', { event: 'DELETE', ...table }, (e) =>
+        setSaved((prev) => prev.filter((p) => p.id !== e.old.id)),
       )
       .subscribe()
     return () => {
@@ -61,7 +80,16 @@ export default function PlaceMap({ room }: { room: Room }) {
   useEffect(() => {
     markers.current.forEach((m) => m.setMap(null))
     markers.current = saved.map(
-      (p) => new naver.maps.Marker({ position: new naver.maps.LatLng(+p.y, +p.x), map: map.current! }),
+      (p) =>
+        new naver.maps.Marker({
+          position: new naver.maps.LatLng(p.lat, p.lng),
+          map: map.current!,
+          title: p.name,
+          icon: {
+            content: `<div style="width:16px;height:16px;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 0 3px #0008"></div>`,
+            anchor: new naver.maps.Point(8, 8),
+          },
+        }),
     )
   }, [saved])
 
@@ -75,26 +103,60 @@ export default function PlaceMap({ room }: { room: Room }) {
 
   async function add(p: Place) {
     map.current!.panTo(new naver.maps.LatLng(+p.y, +p.x))
-    if (saved.some((s) => s.id === p.id)) return
-    setSaved((prev) => [...prev, p])
-    const { error } = await supabase.from('places').insert({
-      room_id: room.id,
+    if (saved.some((s) => s.kakao_id === p.id)) return
+    merge({
+      id: `tmp:${p.id}`,
       kakao_id: p.id,
       name: p.place_name,
       address: p.address_name,
       lat: +p.y,
       lng: +p.x,
+      status: 'want',
+      memo: '',
+      rating: null,
     })
-    if (error && error.code !== '23505') {
-      setSaved((prev) => prev.filter((s) => s.id !== p.id))
-      setError(`저장 실패: ${error.message}`)
+    const { data, error } = await supabase
+      .from('places')
+      .insert({
+        room_id: room.id,
+        kakao_id: p.id,
+        name: p.place_name,
+        address: p.address_name,
+        lat: +p.y,
+        lng: +p.x,
+      })
+      .select(COLUMNS)
+      .single()
+    if (data) merge(data)
+    else if (error?.code !== '23505') {
+      setSaved((prev) => prev.filter((s) => s.kakao_id !== p.id))
+      setError(`저장 실패: ${error?.message}`)
+    }
+  }
+
+  async function patch(p: Saved, fields: Partial<Pick<Saved, 'status' | 'memo' | 'rating'>>) {
+    merge({ ...p, ...fields })
+    const { error } = await supabase.from('places').update(fields).eq('id', p.id)
+    if (error) {
+      merge(p)
+      setError(`수정 실패: ${error.message}`)
+    }
+  }
+
+  async function remove(p: Saved) {
+    if (!window.confirm(`'${p.name}'을(를) 삭제할까요?`)) return
+    setSaved((prev) => prev.filter((s) => s.id !== p.id))
+    const { error } = await supabase.from('places').delete().eq('id', p.id)
+    if (error) {
+      merge(p)
+      setError(`삭제 실패: ${error.message}`)
     }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100svh' }}>
       <div ref={el} style={{ flex: 1 }} />
-      <div style={{ maxHeight: '45svh', overflow: 'auto', padding: 12, textAlign: 'left' }}>
+      <div style={{ maxHeight: '50svh', overflow: 'auto', padding: 12, textAlign: 'left' }}>
         <form onSubmit={search} style={{ display: 'flex', gap: 8 }}>
           <input
             value={query}
@@ -112,7 +174,53 @@ export default function PlaceMap({ room }: { room: Room }) {
           {results.map((p) => (
             <li key={p.id} style={{ padding: '6px 0' }}>
               <b>{p.place_name}</b> <small>{p.address_name}</small>{' '}
-              <button onClick={() => add(p)}>{saved.some((s) => s.id === p.id) ? '추가됨' : '추가'}</button>
+              <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>
+            </li>
+          ))}
+        </ul>
+        <h3>저장한 장소 ({saved.length})</h3>
+        <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
+          {saved.map((p) => (
+            <li key={p.kakao_id} style={{ padding: '8px 0', borderTop: '1px solid #8883' }}>
+              <button
+                onClick={() => map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))}
+                style={{ border: 0, background: 'none', font: 'inherit', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                {p.name}
+              </button>{' '}
+              <small>{p.address}</small>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                <button
+                  disabled={isTemp(p)}
+                  onClick={() => patch(p, { status: p.status === 'want' ? 'visited' : 'want' })}
+                  style={{ color: STATUS_COLOR[p.status] }}
+                >
+                  {STATUS_LABEL[p.status]}
+                </button>
+                <select
+                  disabled={isTemp(p)}
+                  value={p.rating ?? ''}
+                  onChange={(e) => patch(p, { rating: e.target.value ? +e.target.value : null })}
+                >
+                  <option value="">별점 없음</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {'★'.repeat(n)}
+                    </option>
+                  ))}
+                </select>
+                <button disabled={isTemp(p)} onClick={() => remove(p)}>
+                  삭제
+                </button>
+              </div>
+              <input
+                key={p.memo}
+                defaultValue={p.memo}
+                disabled={isTemp(p)}
+                placeholder="메모"
+                onBlur={(e) => e.target.value !== p.memo && patch(p, { memo: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: 6, marginTop: 4 }}
+              />
             </li>
           ))}
         </ul>

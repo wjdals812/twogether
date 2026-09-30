@@ -23,6 +23,9 @@ create table places (
   address text not null,
   lat double precision not null,
   lng double precision not null,
+  status text not null default 'want' check (status in ('want', 'visited')),
+  memo text not null default '',
+  rating smallint check (rating between 1 and 5),
   added_by uuid not null default auth.uid() references auth.users,
   created_at timestamptz not null default now(),
   unique (room_id, kakao_id)

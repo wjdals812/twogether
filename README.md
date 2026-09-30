@@ -1,32 +1,103 @@
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`# twogether
+`
+`함께 가고 싶은 장소를 모아 실시간으로 같이 채워 가는 지도 서비스입니다. 초대 코드로 같은 방에 들어온 사람끼리 장소를 추가하고, 가 본 곳인지 표시하고, 메모와 별점을 남깁니다. 한 사람이 바꾸면 다른 사람의 화면에도 바로 반영됩니다.
+`
+`**배포 주소:** https://twogether-three.vercel.app (회원가입 후 방을 만들거나 초대 코드로 입장)
+`
+`<!-- 화면 캡처나 GIF가 있으면 여기에 넣는다: 지도와 검색, 저장 목록 시트, 두 기기 동기화 -->
+`
+`## 만든 이유
+`
+`네이버 지도에 저장한 장소 목록을 친구나 가족과 공유하면 공유하는 시점의 목록만 보이고, 그 뒤에 추가한 장소는 갱신되지 않아 같이 채워 갈 수 없었습니다. 그래서 네이버 지도는 화면과 길 찾기용으로만 쓰고, 목록은 직접 만든 DB에서 함께 편집하는 구조로 만들었습니다. 만든 사람이 실제로 매일 쓰고 있고, 사용하면서 나온 불편을 고쳐 온 기록이 [docs/DEVLOG.md](docs/DEVLOG.md)에 있습니다.
+`
+`## 주요 기능
+`
+`- 카카오 로컬 API 키워드 검색으로 장소를 찾아 저장 (검색 결과에서 바로 네이버 지도로 확인 가능)
+`- 지도 마커와 저장 목록 연동: 마커를 누르면 해당 장소가 강조되고, 목록에서 고르면 지도가 이동
+`- 가고 싶어요 / 다녀왔어요 상태(마커 색 구분), 별점, 메모, 삭제
+`- 초대 코드 방(최대 4명), 방 단위 데이터 격리
+`- 실시간 동기화: 다른 사람의 추가, 수정, 삭제가 새로고침 없이 반영
+`- 모바일 우선 화면(위쪽 검색창, 아래에서 올라오는 저장 목록 시트)과 PWA 설치
+`
+`## 기술 스택
+`
+`| 영역 | 사용 기술 |
+`|---|---|
+`| 프론트엔드 | React, TypeScript, Vite |
+`| 지도 | 네이버 Dynamic Map (Maps JS v3) |
+`| 장소 검색 | 카카오 로컬 API (키워드 검색) |
+`| 백엔드 | Supabase: Postgres, Auth, Realtime, Row Level Security, SQL 함수 |
+`| 서버리스 | Vercel Functions (검색 API 프록시) |
+`| 배포 | GitHub → Vercel 자동 배포 |
+`
+`## 구조
+`
+````
+`브라우저 ──> 네이버 지도 (공개 가능한 Client ID)
+`   │
+`   ├──> /api/search ──(Vercel 함수: 서버에서 REST 키 추가)──> 카카오 로컬 API
+`   │
+`   └──> Supabase ── Auth(로그인) · Postgres(RLS로 방 단위 접근 제한) · Realtime(변경 구독)
+````
+`
+`테이블은 \`rooms\`, \`room_members\`, \`places\` 세 개입니다. 전체 정의는 [supabase/schema.sql](supabase/schema.sql)에 있습니다.
+`
+`## 설계 결정과 문제 해결
+`
+`### 1. 검색 API가 사라져서 카카오로 교체, 키는 서버에만
+`
+`처음에는 네이버 지역 검색을 쓰려 했지만 네이버 개발자센터에서 검색 API 신청 항목이 없었습니다. 검색 API가 NAVER API HUB로 이전되어 신규 신청을 받지 않는 상태였습니다. 지도는 그대로 네이버를 쓰고 검색만 카카오 로컬 API로 바꿨습니다. 한 번에 최대 15개를 돌려주고, 응답의 좌표(경도, 위도)를 네이버 지도에 바로 쓸 수 있었습니다.
+`
+`카카오 REST 키는 브라우저에 노출되면 안 되므로 \`VITE_\` 접두사를 붙이지 않은 서버 전용 환경 변수로 두고, [api/search.ts](api/search.ts) 함수가 대신 호출합니다. 이 함수는 검색어만 받아 키워드 검색 한 경로만 호출하고, 임의의 경로를 넘겨 줄 수 없게 했습니다. 개발 중에는 같은 주소(\`/api/search\`)를 Vite 프록시가 처리해서 코드가 환경에 따라 달라지지 않습니다.
+`
+`### 2. 방 단위 권한: RLS와 SQL 함수
+`
+`데이터는 방 단위로 분리됩니다. \`is_member()\` 함수(\`security definer\`)로 방 멤버만 \`places\`를 읽고 쓰게 했고, 정책 안에서 멤버 테이블을 다시 조회할 때 생기는 재귀를 이 함수로 피했습니다.
+`
+`\`rooms\`와 \`room_members\`에는 쓰기 정책을 두지 않았습니다. 방 만들기와 입장은 \`create_room()\`, \`join_room()\` 함수로만 가능하고, 그래서 클라이언트가 남의 방에 직접 멤버로 끼어들 수 없습니다. 정원 4명은 \`join_room\`에서 방 행을 \`for update\`로 잠근 뒤 인원을 세서, 여러 명이 동시에 입장해도 정원을 넘지 않게 했습니다.
+`
+`### 3. 실시간 동기화에서 생긴 문제들
+`
+`- **중복:** 내가 저장하면 성공 응답과 실시간 이벤트로 같은 행이 두 번 들어옵니다. \`kakao_id\` 기준으로 합쳐서 한 번만 보이게 했고, 추가 중인 임시 행도 실제 행이 오면 같은 방식으로 교체합니다.
+`- **낙관적 업데이트:** 추가, 수정, 삭제를 화면에 먼저 반영하고 실패하면 이전 상태로 되돌립니다. 추가 중인 행은 저장이 끝나기 전까지 수정과 삭제를 막아 없는 행을 고치는 일을 막았습니다.
+`- **삭제 이벤트:** DELETE 이벤트에는 삭제된 행의 id만 오고 방 조건으로 거를 수 없습니다. 그래서 화면에 가진 id만 제거하도록 처리했습니다.
+`- **아이폰 백그라운드:** 웹에서 추가한 장소가 아이폰 홈 화면 앱에 나타나지 않았습니다. iOS가 백그라운드 앱의 연결을 끊고, 놓친 이벤트는 다시 보내 주지 않는 것으로 추정했습니다(직접 재현하지는 못했습니다). 앱이 다시 보일 때, 실시간 연결이 다시 붙을 때, 네트워크가 돌아올 때 목록을 서버 상태로 다시 불러오도록 해서 해결했습니다. 이때 다른 곳에서 삭제된 장소도 함께 정리됩니다.
+`
+`### 4. 모바일 화면
+`
+`주로 폰으로 쓰기 때문에 지도를 전체 화면으로 깔고 검색창과 저장 목록을 그 위에 겹쳤습니다. 아이폰에서 검색창과 버튼이 보이지 않는 문제가 있었는데, 원인을 하나로 확정하지 못해 두 가지를 함께 막았습니다. 전체 컨테이너를 \`100svh\` 대신 \`position: fixed\`로 바꿔 뷰포트 단위 차이에 의존하지 않게 했고, 지도 컨테이너에 독립된 쌓임 맥락을 만들어 지도 내부 요소가 패널을 덮지 못하게 했습니다.
+`
+`PWA는 manifest와 아이콘만 넣고 서비스 워커는 넣지 않았습니다. 실시간 동기화 앱이라 오프라인 기능의 이점이 적고, 이전 버전이 캐시에 남는 문제를 피하기 위해서입니다.
+`
+`### 5. 공식 API만 사용
+`
+`네이버 장소 상세(사진, 영업시간, 리뷰)는 공개 API가 없습니다. 크롤링은 하지 않고, 장소 이름과 좌표로 네이버 지도 검색 주소를 만들어 새 탭으로 여는 링크로 대신했습니다. 검색어에는 이름만 넣고 저장된 좌표를 지도 중심으로 넘겨서 주변 결과가 먼저 나오게 했습니다.
+`
+`## 로컬에서 실행하기
+`
+`1. 의존성 설치: \`npm install\`
+`2. Supabase 프로젝트를 만들고 SQL Editor에서 [supabase/schema.sql](supabase/schema.sql)을 실행합니다. 이 스크립트는 기존 테이블을 지우고 다시 만듭니다.
+`3. 프로젝트 루트에 \`.env.local\`을 만들고 아래 값을 채웁니다.
+`
+`   | 변수 | 설명 |
+`   |---|---|
+`   | \`VITE_NAVER_MAP_CLIENT_ID\` | 네이버 클라우드 플랫폼 Dynamic Map Client ID (Web 서비스 URL에 \`http://localhost:5173\` 등록) |
+`   | \`VITE_SUPABASE_URL\` | Supabase 프로젝트 URL |
+`   | \`VITE_SUPABASE_ANON_KEY\` | Supabase 공개(anon) 키 |
+`   | \`KAKAO_REST_API_KEY\` | 카카오 REST API 키 (앱의 카카오맵 사용 설정 ON). 서버에서만 사용하며 \`VITE_\`를 붙이지 않음 |
+`
+`4. 실행: \`npm run dev\`
+`
+`배포할 때는 위 네 개를 Vercel 환경 변수에 넣고, 배포 주소를 네이버 콘솔의 Web 서비스 URL과 Supabase의 Site URL, Redirect URLs에 추가합니다.
+`
+`## 한계와 다음 계획
+`
+`- 테스트와 CI가 아직 없습니다.
+`- 검색 함수가 로그인 없이 호출되므로 남용을 막으려면 Supabase 토큰 검증을 추가해야 합니다.
+`- 사용자당 방이 하나로 고정되어 있고 방 나가기가 없습니다.
+`- 카테고리 필터가 없고, 저장 목록 시트는 버튼으로만 열고 닫습니다.
+`- 네이버 지도 링크의 좌표 전달 형식은 공식 문서가 아니라 실제 동작으로 확인한 것이라 네이버가 바꾸면 깨질 수 있습니다.
+`
+`## 개인정보와 키 관리
+`
+`API 키는 저장소에 포함되어 있지 않습니다. 브라우저에 노출되어도 되는 값(지도 Client ID, Supabase URL과 공개 키)만 \`VITE_\` 접두사를 쓰고, 카카오 REST 키는 서버 환경 변수로만 읽습니다. 데이터는 방 멤버에게만 보이도록 RLS로 제한됩니다.

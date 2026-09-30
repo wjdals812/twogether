@@ -19,6 +19,8 @@ type Saved = {
 const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
 const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
 const STATUS_COLOR: Record<Status, string> = { want: '#e5484d', visited: '#30a46c' }
+const naverLink = (name: string, address: string) =>
+  `https://map.naver.com/p/search/${encodeURIComponent(`${name} ${address}`)}`
 const isTemp = (p: Saved) => p.id.startsWith('tmp:')
 
 export default function PlaceMap({ room }: { room: Room }) {
@@ -206,7 +208,10 @@ export default function PlaceMap({ room }: { room: Room }) {
               {results.map((p) => (
                 <li key={p.id} style={{ padding: '6px 0', borderTop: '1px solid var(--border)' }}>
                   <b>{p.place_name}</b> <small>{p.address_name}</small>{' '}
-                  <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>
+                  <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>{' '}
+                  <a href={naverLink(p.place_name, p.address_name)} target="_blank" rel="noopener noreferrer">
+                    네이버 지도
+                  </a>
                 </li>
               ))}
             </ul>
@@ -278,6 +283,14 @@ export default function PlaceMap({ room }: { room: Room }) {
                       </option>
                     ))}
                   </select>
+                  <a
+                    href={naverLink(p.name, p.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ alignSelf: 'center' }}
+                  >
+                    네이버 지도에서 보기
+                  </a>
                   <button disabled={isTemp(p)} onClick={() => remove(p)}>
                     삭제
                   </button>

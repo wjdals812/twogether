@@ -216,15 +216,25 @@ export default function PlaceMap({ room }: { room: Room }) {
         </form>
         {error && <p style={{ color: 'crimson', margin: '8px 0 0' }}>{error}</p>}
         {results.length > 0 && (
-          <div style={{ maxHeight: '45svh', overflow: 'auto', marginTop: 8 }}>
+          <div style={{ maxHeight: '40svh', overflow: 'auto', marginTop: 8 }}>
             <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
               {results.map((p) => (
-                <li key={p.id} style={{ padding: '6px 0', borderTop: '1px solid var(--border)' }}>
-                  <b>{p.place_name}</b> <small>{p.address_name}</small>{' '}
-                  <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>{' '}
-                  <a href={naverLink(p.place_name, +p.y, +p.x)} target="_blank" rel="noopener noreferrer">
-                    네이버 지도
-                  </a>
+                <li
+                  key={p.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid var(--border)' }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b>{p.place_name}</b>
+                    <small style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.address_name}
+                    </small>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => add(p)}>{saved.some((s) => s.kakao_id === p.id) ? '추가됨' : '추가'}</button>
+                    <a href={naverLink(p.place_name, +p.y, +p.x)} target="_blank" rel="noopener noreferrer">
+                      <small>네이버 지도</small>
+                    </a>
+                  </div>
                 </li>
               ))}
             </ul>

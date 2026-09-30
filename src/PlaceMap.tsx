@@ -131,6 +131,27 @@ export default function PlaceMap({ room }: { room: Room }) {
     if (listOpen && selected) document.getElementById(`place-${selected}`)?.scrollIntoView({ block: 'center' })
   }, [listOpen, selected])
 
+  // search while typing: from 2 characters, after a short pause, dropping responses for outdated input
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) return setResults([])
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?query=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        if (!res.ok) return setError(`검색 실패 (${res.status})`)
+        setError('')
+        setResults((await res.json()).documents)
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') setError('검색 실패')
+      }
+    }, 300)
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  }, [query])
+
   async function search(e: React.FormEvent) {
     e.preventDefault()
     setError('')

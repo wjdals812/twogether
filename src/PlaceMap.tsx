@@ -18,7 +18,7 @@ type Saved = {
 
 const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
 const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
-const STATUS_COLOR: Record<Status, string> = { want: '#d4583a', visited: '#2a8a5e' } // keep in sync with --want / --visited in index.css
+const STATUS_COLOR: Record<Status, string> = { want: '#f4a798', visited: '#8fd2b0' } // keep in sync with --want / --visited in index.css
 // name only in the search box, the place's coordinates as map center so nearby matches rank first
 const naverLink = (name: string, lat: number, lng: number) =>
   `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=16.00,${lng},${lat},0,0,0,dh`

@@ -1,15 +1,19 @@
 :root {
-  --paper: #f6f7f9;
+  --paper: #fbfcfd;
   --surface: #fff;
-  --ink: #1c2430;
-  --muted: #66707f;
-  --line: #e2e6ec;
-  --field: #eef1f5;
-  --accent: #2a6f97;
-  --want: #d4583a;
-  --visited: #2a8a5e;
-  --danger: #c2413b;
-  --shadow: 0 1px 2px rgb(28 36 48 / 0.08), 0 10px 28px rgb(28 36 48 / 0.14);
+  --ink: #2a3441;
+  --muted: #6f7a89;
+  --line: #e6eaf0;
+  --field: #f1f4f8;
+  --accent: #b7d5f4;
+  --on-accent: #1f3f63;
+  --link: #3d72b4;
+  --want: #f4a798;
+  --on-want: #6e2a1c;
+  --visited: #8fd2b0;
+  --on-visited: #1d5038;
+  --danger: #cf5a52;
+  --shadow: 0 1px 2px rgb(28 36 48 / 0.06), 0 10px 28px rgb(28 36 48 / 0.10);
   --sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
 
@@ -43,7 +47,7 @@ input {
 }
 
 a {
-  color: var(--accent);
+  color: var(--link);
 }
 
 h1,
@@ -53,7 +57,7 @@ p {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -82,7 +86,7 @@ p {
 .btn-primary {
   border-color: transparent;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn-ghost {
   border-color: transparent;
@@ -112,7 +116,7 @@ p {
   background: var(--surface);
 }
 .field:focus {
-  border-color: var(--accent);
+  border-color: var(--link);
   outline: none;
 }
 .error {
@@ -356,7 +360,7 @@ p {
 }
 .place.selected {
   background: var(--field);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--link);
 }
 .place-name {
   display: block;
@@ -395,14 +399,13 @@ p {
 .seg button + button {
   border-left: 1px solid var(--line);
 }
-.seg button.on {
-  color: #fff;
-}
 .seg button.on.want {
   background: var(--want);
+  color: var(--on-want);
 }
 .seg button.on.visited {
   background: var(--visited);
+  color: var(--on-visited);
 }
 .seg button:disabled,
 .stars button:disabled {
@@ -418,13 +421,13 @@ p {
   padding: 0;
   border: 0;
   background: none;
-  color: #d5dae0;
+  color: #e4e8ee;
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
 }
 .stars button.on {
-  color: #e3a008;
+  color: #f3c969;
 }
 .memo {
   min-height: 42px;

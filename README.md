@@ -5,12 +5,16 @@
 **배포 주소:** https://twogether-three.vercel.app (회원가입 후 방을 만들거나 초대 코드로 입장)
 
 <p>
-  <img src="docs/screenshots/01-map.png" alt="저장한 장소가 마커로 찍힌 지도" width="240">
-  <img src="docs/screenshots/02-search.png" alt="장소 검색 결과" width="240">
-  <img src="docs/screenshots/03-saved-list.png" alt="저장한 장소 목록 시트: 상태, 별점, 메모" width="240">
+  <img src="docs/screenshots/01-login.png" alt="로그인 화면" width="200">
+  <img src="docs/screenshots/02-map.png" alt="저장한 장소가 마커로 찍힌 지도" width="200">
+  <img src="docs/screenshots/03-search.png" alt="장소 검색 결과" width="200">
+</p>
+<p>
+  <img src="docs/screenshots/04-list.png" alt="별점 높은순으로 정렬한 저장 목록: 상태, 별점, 대화" width="200">
+  <img src="docs/screenshots/05-chat.png" alt="장소별 대화 말풍선" width="200">
 </p>
 
-왼쪽부터 지도와 마커, 장소 검색, 저장한 장소 목록입니다. 캡처는 이전 디자인입니다. 아이폰 홈 화면 앱에서 캡처했습니다.
+로그인, 지도와 마커, 장소 검색, 저장한 장소 목록(별점순), 장소별 대화 순서입니다. 아이폰 홈 화면 앱에서 캡처했습니다.
 
 ## 만든 이유
 

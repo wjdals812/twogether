@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { koError } from './errors'
 import { supabase } from './supabase'
-import type { Room } from './RoomGate'
+import { RoomForm, type Room } from './RoomGate'
 
 type Place = { id: string; place_name: string; address_name: string; x: string; y: string }
 type Status = 'want' | 'visited'
@@ -35,7 +35,14 @@ const stamp = (iso: string) => {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const isTemp =(p: Saved) => p.id.startsWith('tmp:')
 
-export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () => void }) {
+export default function PlaceMap({ room, rooms, onSwitch, onRoom, onRename, onLeave }: {
+  room: Room
+  rooms: Room[]
+  onSwitch: (id: string) => void
+  onRoom: (r: Room) => void
+  onRename: (name: string) => void
+  onLeave: () => void
+}) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<naver.maps.Map>(null)
   const markers = useRef<naver.maps.Marker[]>([])
@@ -45,6 +52,7 @@ export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () =>
   const [error, setError] = useState('')
   const searchCache = useRef(new Map<string, Place[]>())
   const [listOpen, setListOpen] = useState(false)
+  const [view, setView] = useState<'rooms' | 'add' | 'room'>('rooms') // the sheet shows the room list first, then one room or the add-room form
   const [closing, setClosing] = useState(false)
   const [flash, setFlash] = useState<string | null>(null) // card marked after a marker tap, until the sheet closes
   // slide the sheet down first, unmount after the transition (0.22s, see .sheet.closing)
@@ -117,6 +125,16 @@ export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () =>
 
   const swipe = useRef<number | null>(null) // touch start y of a possible close-swipe on the sheet
   const edits = useRef(0) // bumped by patch(); a load that started before an edit must not overwrite it
+  const fit = useRef(true) // after entering a room, the first load moves the map to its places
+
+  function fitTo(list: Saved[]) {
+    if (list.length === 0) return
+    const [first, ...rest] = list.map((p) => new naver.maps.LatLng(p.lat, p.lng))
+    if (rest.length === 0) return map.current!.setCenter(first)
+    const bounds = new naver.maps.LatLngBounds(first, first)
+    rest.forEach((c) => bounds.extend(c))
+    map.current!.fitBounds(bounds, { top: 110, right: 40, bottom: 110, left: 40 })
+  }
 
   async function load() {
     const startedAt = edits.current
@@ -133,6 +151,10 @@ export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () =>
       .order('created_at')
     if (c.data) setComments(c.data)
     if (edits.current !== startedAt) return // realtime delivers the edit's result
+    if (fit.current) {
+      fit.current = false
+      fitTo(data)
+    }
     // replace with the server state (drops rows deleted elsewhere) but keep rows still being added
     setSaved((prev) => [
       ...data,
@@ -142,6 +164,13 @@ export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () =>
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? ''))
+    // entering another room: drop the previous room's data until its own load arrives
+    fit.current = true
+    setSaved([])
+    setComments([])
+    setSelected(null)
+    setChatFor(null)
+    setFlash(null)
     load()
 
     const table = { schema: 'public', table: 'places' }
@@ -197,6 +226,7 @@ export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () =>
       naver.maps.Event.addListener(marker, 'click', () => {
         setSelected(p.kakao_id)
         setFlash(p.kakao_id)
+        setView('room')
         setListOpen(true)
       })
       return marker
@@ -310,9 +340,20 @@ export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () =>
       : '나가면 이 방의 장소와 대화를 볼 수 없습니다. 초대 코드로 다시 들어올 수 있습니다.'
     if (!window.confirm(`방을 나갈까요?
 ${warning}`)) return
-    const { error } = await supabase.rpc('leave_room')
+    const { error } = await supabase.rpc('leave_room', { rid: room.id })
     if (error) setError(`나가기 실패: ${koError(error)}`)
-    else onLeave()
+    else {
+      setView('rooms')
+      onLeave()
+    }
+  }
+
+  async function rename() {
+    const name = window.prompt('방 이름', room.name)?.trim()
+    if (!name || name === room.name) return
+    const { error } = await supabase.rpc('rename_room', { rid: room.id, new_name: name })
+    if (error) setError(`이름 변경 실패: ${koError(error)}`)
+    else onRename(name)
   }
 
   async function copyCode() {
@@ -396,12 +437,15 @@ ${warning}`)) return
       {!listOpen && (
         <button
           className="panel dock"
-          onClick={() => setListOpen(true)}
-          aria-label={`저장한 장소 열기. ${STATUS_LABEL.want} ${wantCount}곳, ${STATUS_LABEL.visited} ${visitedCount}곳`}
+          onClick={() => {
+            setView('rooms')
+            setListOpen(true)
+          }}
+          aria-label={`${room.name} 방 열기. ${STATUS_LABEL.want} ${wantCount}곳, ${STATUS_LABEL.visited} ${visitedCount}곳`}
         >
           <span className="dock-title">
             <Icon d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" />
-            Places
+            <span className="dock-name">{room.name}</span>
           </span>
           <span className="dock-count">
             <span className="dot want" />
@@ -441,9 +485,72 @@ ${warning}`)) return
             if (close) closeList()
           }}
         >
+          {view === 'rooms' ? (
+            <>
+              <div className="sheet-head">
+                <h2>🏠 Rooms</h2>
+                <button className="btn btn-ghost btn-icon" aria-label="닫기" onClick={closeList}>
+                  <Icon d="M6 6l12 12M18 6 6 18" />
+                </button>
+              </div>
+              <div className="sheet-body">
+                <ul className="rooms">
+                  {rooms.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        className={r.id === room.id ? 'room-item on' : 'room-item'}
+                        onClick={() => {
+                          onSwitch(r.id)
+                          setView('room')
+                        }}
+                      >
+                        {r.name}
+                        {r.id === room.id && <span>보는 중</span>}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="sheet-foot">
+                  <button className="btn btn-ghost btn-sm" onClick={() => setView('add')}>
+                    방 추가
+                  </button>{' '}
+                  <button className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>
+                    로그아웃
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : view === 'add' ? (
+            <>
+              <div className="sheet-head">
+                <h2>
+                  <button className="btn btn-ghost btn-icon" aria-label="방 목록" onClick={() => setView('rooms')}>
+                    <Icon d="M15 6l-6 6 6 6" />
+                  </button>
+                  새 방 만들기
+                </h2>
+                <button className="btn btn-ghost btn-icon" aria-label="닫기" onClick={closeList}>
+                  <Icon d="M6 6l12 12M18 6 6 18" />
+                </button>
+              </div>
+              <div className="sheet-body room-add">
+                <RoomForm
+                  onRoom={(r) => {
+                    onRoom(r)
+                    setView('room')
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <>
           <div className="sheet-head">
             <h2>
-              📍 Places<span>{saved.length}</span>
+              <button className="btn btn-ghost btn-icon" aria-label="방 목록" onClick={() => setView('rooms')}>
+                <Icon d="M15 6l-6 6 6 6" />
+              </button>
+              {room.name}
+              <span>{saved.length}</span>
             </h2>
             <div>
               <button className="btn btn-ghost btn-icon" aria-label="새로고침" onClick={load}>
@@ -459,14 +566,9 @@ ${warning}`)) return
               <span>
                 초대 코드<b>{room.invite_code}</b>
               </span>
-              <span>
-                <button className="btn btn-sm" onClick={copyCode}>
-                  {copied ? '복사됨' : '복사'}
-                </button>{' '}
-                <button className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>
-                  로그아웃
-                </button>
-              </span>
+              <button className="btn btn-sm" onClick={copyCode}>
+                {copied ? '복사됨' : '복사'}
+              </button>
             </div>
             {saved.length > 1 && (
               <select
@@ -540,11 +642,16 @@ ${warning}`)) return
               </ul>
             )}
             <div className="sheet-foot">
+              <button className="btn btn-ghost btn-sm" onClick={rename}>
+                이름 바꾸기
+              </button>{' '}
               <button className="btn btn-ghost btn-sm danger" onClick={leave}>
                 방 나가기
               </button>
             </div>
           </div>
+            </>
+          )}
         </section>
       )}
       {saved.find((p) => p.kakao_id === chatFor) && (

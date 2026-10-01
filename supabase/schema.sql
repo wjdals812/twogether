@@ -4,14 +4,16 @@ drop table if exists places cascade;
 drop table if exists room_members cascade;
 drop table if exists rooms cascade;
 drop function if exists is_member(uuid);
-drop function if exists create_room();
+drop function if exists create_room(text);
 drop function if exists join_room(text);
-drop function if exists leave_room();
+drop function if exists leave_room(uuid);
+drop function if exists rename_room(uuid, text);
 drop function if exists update_place(uuid, jsonb);
 
 create table rooms (
   id uuid primary key default gen_random_uuid(),
   invite_code text not null unique default upper(substr(md5(random()::text), 1, 6)),
+  name text not null default '새 방' check (char_length(trim(name)) between 1 and 20),
   created_at timestamptz not null default now()
 );
 
@@ -67,15 +69,12 @@ create policy "members add comments" on place_comments for insert
 create policy "authors delete comments" on place_comments for delete using (user_id = auth.uid());
 -- no insert policies on rooms/room_members: only the functions below can write them
 
-create function create_room() returns rooms
+create function create_room(room_name text default '새 방') returns rooms
 language plpgsql security definer set search_path = public as $$
 declare r rooms;
 begin
   if auth.uid() is null then raise exception 'not logged in'; end if;
-  if exists (select 1 from room_members where user_id = auth.uid()) then
-    raise exception 'already in a room';
-  end if;
-  insert into rooms default values returning * into r;
+  insert into rooms (name) values (trim(room_name)) returning * into r;
   insert into room_members (room_id, user_id) values (r.id, auth.uid());
   return r;
 end $$;
@@ -85,11 +84,11 @@ language plpgsql security definer set search_path = public as $$
 declare r rooms;
 begin
   if auth.uid() is null then raise exception 'not logged in'; end if;
-  if exists (select 1 from room_members where user_id = auth.uid()) then
-    raise exception 'already in a room';
-  end if;
   select * into r from rooms where invite_code = upper(trim(code)) for update; -- lock: serialize concurrent joins
   if not found then raise exception 'invalid invite code'; end if;
+  if exists (select 1 from room_members where room_id = r.id and user_id = auth.uid()) then
+    raise exception 'already in this room';
+  end if;
   if (select count(*) from room_members where room_id = r.id) >= 4 then
     raise exception 'room is full';
   end if;
@@ -97,23 +96,27 @@ begin
   return r;
 end $$;
 
-create function leave_room() returns void
-language plpgsql security definer set search_path = public as $
-declare rid uuid;
+create function leave_room(rid uuid) returns void
+language plpgsql security definer set search_path = public as $$
 begin
   if auth.uid() is null then raise exception 'not logged in'; end if;
-  select room_id into rid from room_members where user_id = auth.uid();
-  if rid is null then return; end if;
+  if not exists (select 1 from room_members where room_id = rid and user_id = auth.uid()) then return; end if;
   perform 1 from rooms where id = rid for update; -- same lock as join_room, so nobody joins a room that is being deleted
   delete from room_members where room_id = rid and user_id = auth.uid();
   if not exists (select 1 from room_members where room_id = rid) then
     delete from rooms where id = rid;
   end if;
-end $;
+end $$;
 
+create function rename_room(rid uuid, new_name text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not is_member(rid) then raise exception 'not a member'; end if;
+  update rooms set name = trim(new_name) where id = rid;
+end $$;
 
-revoke execute on function create_room, join_room, leave_room from public, anon;
-grant execute on function create_room, join_room, leave_room to authenticated;
+revoke execute on function create_room, join_room, leave_room, rename_room from public, anon;
+grant execute on function create_room, join_room, leave_room, rename_room to authenticated;
 
 -- POST-based fallback for browsers/networks that block PATCH. security invoker: RLS still applies.
 create function update_place(pid uuid, fields jsonb) returns void

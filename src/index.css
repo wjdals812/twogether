@@ -272,6 +272,14 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 40vw;
+}
+.dock-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock-title svg {
+  flex-shrink: 0;
 }
 .dock-count {
   display: inline-flex;
@@ -367,8 +375,14 @@ p {
   padding: 14px 10px 10px 18px;
 }
 .sheet-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   font-size: 17px;
   font-weight: 700;
+}
+.sheet-head h2 .btn {
+  margin-left: -10px;
 }
 .sheet-head h2 span {
   margin-left: 4px;
@@ -411,6 +425,38 @@ p {
 .sheet-foot {
   padding: 12px 18px 0;
   text-align: center;
+}
+.rooms {
+  margin: 0;
+  padding: 0 16px;
+  list-style: none;
+}
+.room-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.room-item.on {
+  border-color: var(--accent);
+  background: var(--field);
+}
+.room-item span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.room-add {
+  margin: 0 16px;
 }
 .list {
   margin: 0;

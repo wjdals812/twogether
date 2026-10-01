@@ -264,14 +264,19 @@ p {
   left: 50%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 18px;
+  gap: 10px;
+  padding: 11px 16px;
   transform: translateX(-50%);
   border: 1px solid var(--line);
   border-radius: 999px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+}
+.dock-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .dock-count {
   display: inline-flex;
@@ -294,6 +299,26 @@ p {
   background: var(--visited);
 }
 
+/* selected map marker: a halo that keeps pulsing outward */
+.pin.on::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: var(--c);
+  animation: ping 1.5s ease-out infinite;
+}
+@keyframes ping {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
 .sheet {
   bottom: 0;
   left: 0;
@@ -305,6 +330,11 @@ p {
   max-height: 65svh;
   margin-inline: auto;
   border-radius: 20px 20px 0 0;
+  animation: rise 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.sheet.closing {
+  transform: translateY(100%);
+  transition: transform 0.22s ease-out;
 }
 .sheet-head {
   display: flex;
@@ -323,6 +353,7 @@ p {
 }
 .sheet-body {
   overflow: auto;
+  overscroll-behavior: contain; /* keep the browser's pull-to-refresh/bounce from fighting the swipe-to-close */
   padding-bottom: calc(10px + env(safe-area-inset-bottom));
 }
 .invite {
@@ -358,9 +389,18 @@ p {
   padding: 14px 18px;
   border-top: 1px solid var(--line);
 }
-.place.selected {
+/* the card of a tapped map marker, marked while the sheet stays open */
+.place.flash {
   background: var(--field);
   box-shadow: inset 3px 0 0 var(--link);
+}
+/* name + address: clicking anywhere here (out to the card edges) moves the map to the place */
+.place-head {
+  margin: -14px -18px 0;
+  padding: 14px 18px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent; /* no blue flash when tapped */
+  user-select: none;
 }
 .place-name {
   display: block;

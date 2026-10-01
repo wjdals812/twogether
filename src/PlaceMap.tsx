@@ -42,6 +42,17 @@ export default function PlaceMap({ room }: { room: Room }) {
   const [error, setError] = useState('')
   const searchCache = useRef(new Map<string, Place[]>())
   const [listOpen, setListOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null) // card marked after a marker tap, until the sheet closes
+  // slide the sheet down first, unmount after the transition (0.22s, see .sheet.closing)
+  const closeList = () => {
+    setClosing(true)
+    setTimeout(() => {
+      setListOpen(false)
+      setClosing(false)
+      setFlash(null)
+    }, 220)
+  }
   const [copied, setCopied] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -57,6 +68,7 @@ export default function PlaceMap({ room }: { room: Room }) {
     const click = naver.maps.Event.addListener(m, 'click', () => {
       setResults([])
       setSelected(null)
+      closeList()
     })
     return () => {
       naver.maps.Event.removeListener(click)
@@ -94,6 +106,7 @@ export default function PlaceMap({ room }: { room: Room }) {
     }
   }
 
+  const swipe = useRef<number | null>(null) // touch start y of a possible close-swipe on the sheet
   const edits = useRef(0) // bumped by patch(); a load that started before an edit must not overwrite it
 
   async function load() {
@@ -159,19 +172,22 @@ export default function PlaceMap({ room }: { room: Room }) {
       m.setMap(null)
     })
     markers.current = saved.map((p) => {
-      const size = p.kakao_id === selected ? 28 : 20
+      const size = 14
+      const on = p.kakao_id === selected
       const marker = new naver.maps.Marker({
         position: new naver.maps.LatLng(p.lat, p.lng),
         map: map.current!,
         title: p.name,
-        zIndex: p.kakao_id === selected ? 100 : 1,
+        zIndex: on ? 100 : 1,
         icon: {
-          content: `<div style="width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 1px 4px rgb(28 36 48 / .45)"></div>`,
+          // the selected marker gets a pulsing halo (.pin.on::after in index.css)
+          content: `<div class="${on ? 'pin on' : 'pin'}" style="--c:${STATUS_COLOR[p.status]};position:relative;width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 1px 4px rgb(28 36 48 / .45)"></div>`,
           anchor: new naver.maps.Point(size / 2, size / 2),
         },
       })
       naver.maps.Event.addListener(marker, 'click', () => {
         setSelected(p.kakao_id)
+        setFlash(p.kakao_id)
         setListOpen(true)
       })
       return marker
@@ -259,6 +275,12 @@ export default function PlaceMap({ room }: { room: Room }) {
       merge(p)
       setError(`수정 실패: ${error.message}`)
     }
+  }
+
+  function focusPlace(p: Saved) {
+    map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
+    setSelected(p.kakao_id)
+    closeList()
   }
 
   async function remove(p: Saved) {
@@ -352,7 +374,10 @@ export default function PlaceMap({ room }: { room: Room }) {
           onClick={() => setListOpen(true)}
           aria-label={`저장한 장소 열기. 가고 싶어요 ${wantCount}곳, 다녀왔어요 ${visitedCount}곳`}
         >
-          저장한 장소
+          <span className="dock-title">
+            <Icon d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" />
+            Places
+          </span>
           <span className="dock-count">
             <span className="dot want" />
             {wantCount}
@@ -361,20 +386,45 @@ export default function PlaceMap({ room }: { room: Room }) {
             <span className="dot visited" />
             {visitedCount}
           </span>
+          <Icon d="M6 15l6-6 6 6" />
         </button>
       )}
 
       {listOpen && (
-        <section className="panel sheet" aria-label="저장한 장소">
+        <section
+          className={closing ? 'panel sheet closing' : 'panel sheet'}
+          aria-label="place"
+          // swipe down closes the sheet: from the header, or from the list while it is scrolled to the top
+          onTouchStart={(e) => {
+            const t = e.target as HTMLElement
+            const atTop = !!t.closest('.sheet-head') || (e.currentTarget.querySelector('.sheet-body')?.scrollTop ?? 0) === 0
+            swipe.current = atTop ? e.touches[0].clientY : null
+          }}
+          onTouchMove={(e) => {
+            if (swipe.current === null) return
+            const dy = Math.max(0, e.touches[0].clientY - swipe.current)
+            e.currentTarget.style.transition = 'none'
+            e.currentTarget.style.transform = `translateY(${dy}px)`
+          }}
+          onTouchEnd={(e) => {
+            if (swipe.current === null) return
+            const el = e.currentTarget
+            const close = e.changedTouches[0].clientY - swipe.current > 80
+            swipe.current = null
+            el.style.transition = 'transform 0.22s ease-out'
+            el.style.transform = close ? 'translateY(100%)' : ''
+            if (close) closeList()
+          }}
+        >
           <div className="sheet-head">
             <h2>
-              저장한 장소<span>{saved.length}</span>
+              Place<span>{saved.length}</span>
             </h2>
             <div>
               <button className="btn btn-ghost btn-icon" aria-label="새로고침" onClick={load}>
                 <Icon d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" />
               </button>
-              <button className="btn btn-ghost btn-icon" aria-label="닫기" onClick={() => setListOpen(false)}>
+              <button className="btn btn-ghost btn-icon" aria-label="닫기" onClick={closeList}>
                 <Icon d="M6 6l12 12M18 6 6 18" />
               </button>
             </div>
@@ -396,19 +446,12 @@ export default function PlaceMap({ room }: { room: Room }) {
                   <li
                     key={p.kakao_id}
                     id={`place-${p.kakao_id}`}
-                    className={p.kakao_id === selected ? 'place selected' : 'place'}
+                    className={p.kakao_id === flash ? 'place flash' : 'place'}
                   >
-                    <button
-                      className="place-name"
-                      onClick={() => {
-                        map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
-                        setSelected(p.kakao_id)
-                        setListOpen(false)
-                      }}
-                    >
-                      {p.name}
-                    </button>
-                    <span className="place-addr">{p.address}</span>
+                    <div className="place-head" onClick={() => focusPlace(p)}>
+                      <button className="place-name">{p.name}</button>
+                      <span className="place-addr">{p.address}</span>
+                    </div>
                     <div className="place-tools">
                       <div className="seg" role="group" aria-label="상태">
                         {(['want', 'visited'] as Status[]).map((st) => (

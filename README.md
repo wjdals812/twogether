@@ -10,7 +10,7 @@
   <img src="docs/screenshots/03-search.png" alt="장소 검색 결과" width="200">
 </p>
 <p>
-  <img src="docs/screenshots/04-list.png" alt="별점 높은순으로 정렬한 저장 목록: 상태, 별점, 대화" width="200">
+  <img src="docs/screenshots/04-list.jpg" alt="별점 높은순으로 정렬한 저장 목록: 상태, 별점, 대화" width="200">
   <img src="docs/screenshots/05-chat.png" alt="장소별 대화 말풍선" width="200">
 </p>
 

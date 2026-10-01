@@ -27,7 +27,11 @@ export default function App() {
 
   // a room is renamed by another member without any event reaching us, so reload when the user looks at the room list
   async function loadRooms() {
-    const { data } = await supabase.from('room_members').select('rooms(id, invite_code, name, created_at)')
+    // room_members is readable for every member of my rooms, so without this filter a room shows up once per member
+    const { data } = await supabase
+      .from('room_members')
+      .select('rooms(id, invite_code, name, created_at)')
+      .eq('user_id', session?.user.id ?? '')
     const list = (data ?? []).map((m) => m.rooms as unknown as Room)
     list.sort((a, b) => a.created_at.localeCompare(b.created_at))
     setRooms((prev) => (data ? list : (prev ?? [])))

@@ -10,11 +10,15 @@ export function RoomForm({ onRoom }: { onRoom: (r: Room) => void }) {
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false) // a second tap while the first is in flight would create a second room
 
   async function run(fn: 'create_room' | 'join_room') {
+    if (busy) return
+    setBusy(true)
     setError('')
     const args = fn === 'join_room' ? { code } : { room_name: name.trim() || '새 방' }
     const { data, error } = await supabase.rpc(fn, args)
+    setBusy(false)
     if (error) setError(koError(error))
     else onRoom(data)
   }
@@ -28,7 +32,7 @@ export function RoomForm({ onRoom }: { onRoom: (r: Room) => void }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <button className="btn btn-primary" onClick={() => run('create_room')}>
+      <button className="btn btn-primary" onClick={() => run('create_room')} disabled={busy}>
         새 방 만들기
       </button>
       <div className="divider">또는</div>
@@ -39,7 +43,7 @@ export function RoomForm({ onRoom }: { onRoom: (r: Room) => void }) {
         value={code}
         onChange={(e) => setCode(e.target.value)}
       />
-      <button className="btn" onClick={() => run('join_room')} disabled={!code.trim()}>
+      <button className="btn" onClick={() => run('join_room')} disabled={busy || !code.trim()}>
         코드로 입장
       </button>
       {error && <p className="error">{error}</p>}

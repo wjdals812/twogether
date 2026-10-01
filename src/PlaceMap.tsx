@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Course from './Course'
 import { koError } from './errors'
 import { supabase } from './supabase'
 import { RoomForm, type Room } from './RoomGate'
@@ -70,6 +71,7 @@ export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onR
   const [selected, setSelected] = useState<string | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [chatFor, setChatFor] = useState<string | null>(null)
+  const [courseOpen, setCourseOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null) // draft name while the rename dialog is open
   const [uid, setUid] = useState('')
 
@@ -578,6 +580,9 @@ ${warning}`)) return
                 {copied ? '복사됨' : '복사'}
               </button>
             </div>
+            <button className="btn course-open" disabled={wantCount < 2} onClick={() => setCourseOpen(true)}>
+              ✨ 코스 짜기{wantCount < 2 && ' (가보자 장소 2곳 이상)'}
+            </button>
             {saved.length > 1 && (
               <select
                 className="sort"
@@ -661,6 +666,17 @@ ${warning}`)) return
             </>
           )}
         </section>
+      )}
+      {courseOpen && (
+        <Course
+          roomId={room.id}
+          onClose={() => setCourseOpen(false)}
+          onPick={(s) => {
+            const p = saved.find((x) => x.name === s.name && x.address === s.address)
+            setCourseOpen(false)
+            if (p) focusPlace(p)
+          }}
+        />
       )}
       {renaming !== null && (
         <div className="modal center" onClick={() => setRenaming(null)}>

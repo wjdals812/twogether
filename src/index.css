@@ -672,6 +672,55 @@ p {
   gap: 8px;
   justify-content: flex-end;
 }
+.course-open {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 0 16px 8px;
+}
+.course-hint,
+.course-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.course-summary {
+  color: var(--ink);
+}
+.course {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.course button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+.course b {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+}
+.course small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
 .modal-box .chat {
   margin: 0;
   padding: 0 18px 16px;

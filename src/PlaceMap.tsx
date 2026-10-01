@@ -180,7 +180,7 @@ export default function PlaceMap({ room }: { room: Room }) {
       m.setMap(null)
     })
     markers.current = saved.map((p) => {
-      const size = 14
+      const size = 16
       const on = p.kakao_id === selected
       const marker = new naver.maps.Marker({
         position: new naver.maps.LatLng(p.lat, p.lng),

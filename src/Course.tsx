@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { supabase } from './supabase'
 
-type Stop = { name: string; address: string; note: string }
+type Stop = { name: string; address: string; note: string; m?: number } // m: meters from the previous stop
 type Plan = { summary: string; stops: Stop[] }
+
+// straight-line distance x1.3 for winding streets, 80 m per minute; too far to walk shows the distance instead
+const gap = (m: number) => {
+  const min = Math.max(1, Math.round((m * 1.3) / 80))
+  return min >= 25 ? `약 ${(m / 1000).toFixed(1)}km` : `도보 약 ${min}분`
+}
 
 const MESSAGES: Record<string, string> = {
   too_few: '가보자 장소가 2곳 이상 있어야 코스를 짤 수 있어요.',
@@ -60,8 +66,10 @@ export default function Course({ roomId, onPick, onClose }: {
             <ol className="course">
               {plan.stops.map((s, i) => (
                 <li key={s.name + s.address}>
+                  {/* the time to the next stop hangs off this row, see .course-gap */}
+                  {plan.stops[i + 1]?.m !== undefined && <span className="course-gap">{gap(plan.stops[i + 1].m!)}</span>}
                   <button type="button" onClick={() => onPick(s)}>
-                    <b>{i + 1}</b>
+                    <b aria-hidden="true" />
                     <span>
                       {s.name}
                       {s.note && <small>{s.note}</small>}

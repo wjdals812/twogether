@@ -686,40 +686,89 @@ p {
 .course-summary {
   color: var(--ink);
 }
+/* course as a timeline: a line down the middle, stops alternating left and right, a dot per stop sitting on the line */
 .course {
+  position: relative;
   display: grid;
-  gap: 8px;
+  gap: 26px;
   margin: 0;
-  padding: 0;
+  padding: 4px 0;
   list-style: none;
 }
-.course button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
+.course::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--accent);
+}
+.course li {
+  position: relative;
+  width: calc(50% - 20px);
+}
+.course li:nth-child(odd) {
+  justify-self: start;
+  text-align: right;
+}
+.course li:nth-child(even) {
+  justify-self: end;
   text-align: left;
+}
+.course button {
+  display: block;
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: inherit;
   cursor: pointer;
 }
 .course b {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 26px;
-  height: 26px;
+  position: absolute;
+  top: 10px;
+  z-index: 1;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 13px;
+  background: var(--link);
+  box-shadow: 0 0 0 4px var(--surface); /* gap between the dot and the line */
+}
+.course li:nth-child(odd) b {
+  right: -23.5px;
+}
+.course li:nth-child(even) b {
+  left: -23.5px;
+}
+/* walking time to the next stop. It hangs off the row above, on the other side of the line from that stop, and sits halfway
+   between the two dots: row height / 2 + half the row gap (26px / 2 = 13px) + the dot's center (10px + 3.5px) below the row top */
+.course-gap {
+  position: absolute;
+  top: calc(50% + 26.5px);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+.course li:nth-child(odd) .course-gap {
+  left: calc(100% + 28px); /* this stop is on the left: label starts 8px right of the line */
+}
+.course li:nth-child(even) .course-gap {
+  right: calc(100% + 28px); /* this stop is on the right: label ends 8px left of the line */
 }
 .course small {
   display: block;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11.5px;
+  font-weight: 400;
 }
 .modal-box .chat {
   margin: 0;

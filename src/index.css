@@ -242,14 +242,9 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.result-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.result-side a {
+.result-link {
+  display: inline-block;
+  padding-top: 2px;
   color: var(--muted);
   font-size: 12px;
 }

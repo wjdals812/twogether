@@ -351,21 +351,24 @@ export default function PlaceMap({ room }: { room: Room }) {
                   <div className="result-text">
                     <span className="result-name">{p.place_name}</span>
                     <span className="result-addr">{p.address_name}</span>
-                  </div>
-                  <div className="result-side">
-                    {saved.some((s) => s.kakao_id === p.id) ? (
-                      <button className="btn btn-sm" disabled>
-                        추가됨
-                      </button>
-                    ) : (
-                      <button className="btn btn-sm btn-primary" onClick={() => add(p)}>
-                        추가
-                      </button>
-                    )}
-                    <a href={naverLink(p.place_name, +p.y, +p.x)} target="_blank" rel="noopener noreferrer">
+                    <a
+                      className="result-link"
+                      href={naverLink(p.place_name, +p.y, +p.x)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       네이버 지도 ↗
                     </a>
                   </div>
+                  {saved.some((s) => s.kakao_id === p.id) ? (
+                    <button className="btn btn-sm" disabled>
+                      추가됨
+                    </button>
+                  ) : (
+                    <button className="btn btn-sm btn-primary" onClick={() => add(p)}>
+                      추가
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

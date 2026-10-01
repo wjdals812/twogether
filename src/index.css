@@ -403,6 +403,16 @@ p {
   letter-spacing: 0.08em;
   font-variant-numeric: tabular-nums;
 }
+.sort {
+  display: block;
+  margin: 0 16px 4px auto;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
 .list {
   margin: 0;
   padding: 0;
@@ -609,8 +619,4 @@ p {
   justify-content: space-between;
   margin-top: 8px;
   font-size: 13px;
-}
-.sheet-foot {
-  padding: 8px 18px 0;
-  text-align: center;
 }

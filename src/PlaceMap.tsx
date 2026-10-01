@@ -56,6 +56,7 @@ export default function PlaceMap({ room }: { room: Room }) {
     }, 220)
   }
   const [copied, setCopied] = useState(false)
+  const [byRating, setByRating] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [chatFor, setChatFor] = useState<string | null>(null)
@@ -441,15 +442,31 @@ export default function PlaceMap({ room }: { room: Room }) {
               <span>
                 초대 코드<b>{room.invite_code}</b>
               </span>
-              <button className="btn btn-sm" onClick={copyCode}>
-                {copied ? '복사됨' : '복사'}
-              </button>
+              <span>
+                <button className="btn btn-sm" onClick={copyCode}>
+                  {copied ? '복사됨' : '복사'}
+                </button>{' '}
+                <button className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>
+                  로그아웃
+                </button>
+              </span>
             </div>
+            {saved.length > 1 && (
+              <select
+                className="sort"
+                aria-label="정렬"
+                value={byRating ? 'rating' : 'added'}
+                onChange={(e) => setByRating(e.target.value === 'rating')}
+              >
+                <option value="added">등록순</option>
+                <option value="rating">별점 높은순</option>
+              </select>
+            )}
             {saved.length === 0 ? (
               <p className="empty">저장한 장소가 없습니다. 위 검색창에서 장소를 찾아 추가해 보세요.</p>
             ) : (
               <ul className="list">
-                {saved.map((p) => (
+                {(byRating ? [...saved].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)) : saved).map((p) => (
                   <li
                     key={p.kakao_id}
                     id={`place-${p.kakao_id}`}
@@ -503,11 +520,6 @@ export default function PlaceMap({ room }: { room: Room }) {
                 ))}
               </ul>
             )}
-            <div className="sheet-foot">
-              <button className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>
-                로그아웃
-              </button>
-            </div>
           </div>
         </section>
       )}

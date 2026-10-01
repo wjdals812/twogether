@@ -30,5 +30,5 @@ export default function App() {
   if (!session) return <Auth />
   if (room === undefined) return null
   if (!room) return <RoomGate onRoom={setRoom} />
-  return <PlaceMap room={room} />
+  return <PlaceMap room={room} onLeave={() => setRoom(null)} />
 }

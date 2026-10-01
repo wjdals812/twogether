@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { koError } from './errors'
 import { supabase } from './supabase'
 import type { Room } from './RoomGate'
 
@@ -34,7 +35,7 @@ const stamp = (iso: string) => {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const isTemp =(p: Saved) => p.id.startsWith('tmp:')
 
-export default function PlaceMap({ room }: { room: Room }) {
+export default function PlaceMap({ room, onLeave }: { room: Room; onLeave: () => void }) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<naver.maps.Map>(null)
   const markers = useRef<naver.maps.Marker[]>([])
@@ -301,6 +302,19 @@ export default function PlaceMap({ room }: { room: Room }) {
     }
   }
 
+  async function leave() {
+    const { count } = await supabase.from('room_members').select('*', { count: 'exact', head: true }).eq('room_id', room.id)
+    const last = (count ?? 2) <= 1
+    const warning = last
+      ? '마지막 사람이라 방과 저장한 장소, 대화가 모두 삭제됩니다.'
+      : '나가면 이 방의 장소와 대화를 볼 수 없습니다. 초대 코드로 다시 들어올 수 있습니다.'
+    if (!window.confirm(`방을 나갈까요?
+${warning}`)) return
+    const { error } = await supabase.rpc('leave_room')
+    if (error) setError(`나가기 실패: ${koError(error)}`)
+    else onLeave()
+  }
+
   async function copyCode() {
     try {
       await navigator.clipboard.writeText(room.invite_code)
@@ -525,6 +539,11 @@ export default function PlaceMap({ room }: { room: Room }) {
                 ))}
               </ul>
             )}
+            <div className="sheet-foot">
+              <button className="btn btn-ghost btn-sm danger" onClick={leave}>
+                방 나가기
+              </button>
+            </div>
           </div>
         </section>
       )}

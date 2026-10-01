@@ -6,6 +6,7 @@ drop table if exists rooms cascade;
 drop function if exists is_member(uuid);
 drop function if exists create_room();
 drop function if exists join_room(text);
+drop function if exists leave_room();
 drop function if exists update_place(uuid, jsonb);
 
 create table rooms (
@@ -96,8 +97,23 @@ begin
   return r;
 end $$;
 
-revoke execute on function create_room, join_room from public, anon;
-grant execute on function create_room, join_room to authenticated;
+create function leave_room() returns void
+language plpgsql security definer set search_path = public as $
+declare rid uuid;
+begin
+  if auth.uid() is null then raise exception 'not logged in'; end if;
+  select room_id into rid from room_members where user_id = auth.uid();
+  if rid is null then return; end if;
+  perform 1 from rooms where id = rid for update; -- same lock as join_room, so nobody joins a room that is being deleted
+  delete from room_members where room_id = rid and user_id = auth.uid();
+  if not exists (select 1 from room_members where room_id = rid) then
+    delete from rooms where id = rid;
+  end if;
+end $;
+
+
+revoke execute on function create_room, join_room, leave_room from public, anon;
+grant execute on function create_room, join_room, leave_room to authenticated;
 
 -- POST-based fallback for browsers/networks that block PATCH. security invoker: RLS still applies.
 create function update_place(pid uuid, fields jsonb) returns void

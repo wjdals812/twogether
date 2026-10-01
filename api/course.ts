@@ -1,5 +1,5 @@
 // ponytail: no per-user rate limit. Only members of the room can call this (RLS), so the free quota is shared by a few people; add a counter table if that changes.
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash' // model names get retired, so it can be swapped without a deploy of code
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite' // model names get retired, so it can be swapped without a deploy of code
 
 const SYSTEM = `You plan a day-out course in Korea for a couple or friends.
 Use ONLY the numbered places you are given. Order them so the day flows well (use the coordinates to keep travel short, and guess meal / cafe / walk from the names).
@@ -36,17 +36,22 @@ export async function POST(request: Request) {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM }] },
       contents: [{ role: 'user', parts: [{ text: `Places:\n${list}\n\n<wish>${wish || 'none'}</wish>` }] }],
-      // thinking off: a short ordering task, and the wait is on screen
-      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+      // no thinkingConfig: its fields differ per model generation, and flash-lite thinks minimally by default
+      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 2048 },
     }),
   })
-  if (!res.ok) return fail('ai_failed', 502)
+  if (!res.ok) {
+    console.error('gemini', MODEL, res.status, (await res.text()).slice(0, 500)) // shown in the Vercel function logs
+    return fail('ai_failed', 502)
+  }
 
-  const text: string = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+  const answer = await res.json()
+  const text: string = answer.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
   let plan: { summary?: unknown; stops?: { i?: unknown; note?: unknown }[] }
   try {
     plan = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? '')
   } catch {
+    console.error('gemini unparsable answer', JSON.stringify(answer).slice(0, 500))
     return fail('ai_failed', 502)
   }
 
@@ -58,6 +63,9 @@ export async function POST(request: Request) {
     seen.add(i)
     return [{ name: data[i].name, address: data[i].address, note: typeof s.note === 'string' ? s.note : '' }]
   })
-  if (stops.length === 0) return fail('ai_failed', 502)
+  if (stops.length === 0) {
+    console.error('gemini returned no usable stops', text.slice(0, 500))
+    return fail('ai_failed', 502)
+  }
   return Response.json({ summary: typeof plan.summary === 'string' ? plan.summary : '', stops })
 }

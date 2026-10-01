@@ -41,7 +41,7 @@
 | 장소 검색 | 카카오 로컬 API (키워드 검색) |
 | 백엔드 | Supabase: Postgres, Auth, Realtime, Row Level Security, SQL 함수 |
 | 서버리스 | Vercel Functions (검색 API 프록시, AI 코스 추천) |
-| AI | Google Gemini API (2.5 Flash, 무료 한도) |
+| AI | Google Gemini API (3.5 Flash-Lite, 무료 한도) |
 | 배포 | GitHub → Vercel 자동 배포 |
 
 ## 구조
@@ -121,9 +121,9 @@ AI에게는 장소를 번호로 주고 번호로 답하게 했습니다. 서버�
    | `VITE_SUPABASE_URL` | Supabase 프로젝트 URL |
    | `VITE_SUPABASE_ANON_KEY` | Supabase 공개(anon) 키 |
    | `KAKAO_REST_API_KEY` | 카카오 REST API 키 (앱의 카카오맵 사용 설정 ON). 서버에서만 사용하며 `VITE_`를 붙이지 않음 |
-   | `GEMINI_API_KEY` | AI 코스 짜기용 Google Gemini API 키(선택, Google AI Studio에서 발급). 서버에서만 사용하며, 없으면 코스 짜기만 "설정되지 않았습니다"라고 안내. 모델을 바꾸려면 `GEMINI_MODEL`(기본 `gemini-2.5-flash`) |
+   | `GEMINI_API_KEY` | AI 코스 짜기용 Google Gemini API 키(선택, Google AI Studio에서 발급). 서버에서만 사용하며, 없으면 코스 짜기만 "설정되지 않았습니다"라고 안내. 모델을 바꾸려면 `GEMINI_MODEL`(기본 `gemini-3.5-flash-lite`) |
 
-4. 실행: `npm run dev` (코스 짜기는 Vercel 함수라 `npm run dev`에서는 동작하지 않고, 배포된 사이트나 `vercel dev`에서 쓸 수 있습니다)
+4. 실행: `npm run dev` (코스 짜기 요청은 배포된 사이트의 함수로 전달되므로 로컬에 Gemini 키가 없어도 동작합니다. 함수 코드 자체를 시험하려면 `vercel dev`를 쓰세요)
 
 배포할 때는 위 네 개를 Vercel 환경 변수에 넣고, 배포 주소를 네이버 콘솔의 Web 서비스 URL과 Supabase의 Site URL, Redirect URLs에 추가합니다.
 

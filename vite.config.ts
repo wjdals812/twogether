@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
           rewrite: (p) => p.replace('/api/search', '/v2/local/search/keyword.json'),
           headers: { Authorization: `KakaoAK ${env.KAKAO_REST_API_KEY}` },
         },
+        // ponytail: dev uses the deployed function (and its Gemini key); run `vercel dev` instead to test api/course.ts itself
+        '/api/course': { target: 'https://twogether-three.vercel.app', changeOrigin: true },
       },
     },
   }

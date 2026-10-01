@@ -8,10 +8,10 @@
   --accent: #b7d5f4;
   --on-accent: #1f3f63;
   --link: #3d72b4;
-  --want: #f4a798;
-  --on-want: #6e2a1c;
-  --visited: #8fd2b0;
-  --on-visited: #1d5038;
+  --want: #fbe8a6;
+  --on-want: #5e4710;
+  --visited: #8fbcec;
+  --on-visited: #1f3f63;
   --danger: #cf5a52;
   --shadow: 0 1px 2px rgb(28 36 48 / 0.06), 0 10px 28px rgb(28 36 48 / 0.10);
   --sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo',
@@ -506,7 +506,7 @@ p {
   cursor: pointer;
 }
 .stars button.on {
-  color: #f3c969;
+  color: #f0a030;
 }
 .chat {
   display: flex;

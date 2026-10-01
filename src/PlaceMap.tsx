@@ -17,8 +17,8 @@ type Saved = {
 }
 
 const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, rating'
-const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
-const STATUS_COLOR: Record<Status, string> = { want: '#f4a798', visited: '#8fd2b0' } // keep in sync with --want / --visited in index.css
+const STATUS_LABEL: Record<Status, string> = { want: '🏃가보자', visited: '😎방문완' }
+const STATUS_COLOR: Record<Status, string> = { want: '#fbe8a6', visited: '#8fbcec' } // keep in sync with --want / --visited in index.css
 // name only in the search box, the place's coordinates as map center so nearby matches rank first
 const naverLink = (name: string, lat: number, lng: number) =>
   `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=16.00,${lng},${lat},0,0,0,dh`
@@ -380,7 +380,7 @@ export default function PlaceMap({ room }: { room: Room }) {
         <button
           className="panel dock"
           onClick={() => setListOpen(true)}
-          aria-label={`저장한 장소 열기. 가고 싶어요 ${wantCount}곳, 다녀왔어요 ${visitedCount}곳`}
+          aria-label={`저장한 장소 열기. ${STATUS_LABEL.want} ${wantCount}곳, ${STATUS_LABEL.visited} ${visitedCount}곳`}
         >
           <span className="dock-title">
             <Icon d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" />
@@ -426,7 +426,7 @@ export default function PlaceMap({ room }: { room: Room }) {
         >
           <div className="sheet-head">
             <h2>
-              Place<span>{saved.length}</span>
+              📍 Places<span>{saved.length}</span>
             </h2>
             <div>
               <button className="btn btn-ghost btn-icon" aria-label="새로고침" onClick={load}>
@@ -500,7 +500,9 @@ export default function PlaceMap({ room }: { room: Room }) {
                             aria-pressed={p.rating === n}
                             onClick={() => patch(p, { rating: p.rating === n ? null : n })}
                           >
-                            ★
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M12 4l2.5 5.2 5.6.8-4 4 1 5.6L12 17l-5.1 2.6 1-5.6-4-4 5.6-.8z" />
+                            </svg>
                           </button>
                         ))}
                       </div>

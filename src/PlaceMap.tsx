@@ -30,7 +30,9 @@ const stamp = (iso: string) => {
     ? d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
     : d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
 }
-const isTemp = (p: Saved) => p.id.startsWith('tmp:')
+// marker content is raw HTML and names come from other room members
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+const isTemp =(p: Saved) => p.id.startsWith('tmp:')
 
 export default function PlaceMap({ room }: { room: Room }) {
   const el = useRef<HTMLDivElement>(null)
@@ -65,6 +67,10 @@ export default function PlaceMap({ room }: { room: Room }) {
       zoom: 14,
     })
     map.current = m
+    // marker names are shown from this zoom level on (.zoomed in index.css)
+    const showNames = () => el.current?.classList.toggle('zoomed', m.getZoom() >= 16)
+    showNames()
+    const zoom = naver.maps.Event.addListener(m, 'zoom_changed', showNames)
     const click = naver.maps.Event.addListener(m, 'click', () => {
       setResults([])
       setSelected(null)
@@ -72,6 +78,7 @@ export default function PlaceMap({ room }: { room: Room }) {
     })
     return () => {
       naver.maps.Event.removeListener(click)
+      naver.maps.Event.removeListener(zoom)
       m.destroy()
     }
   }, [])
@@ -181,7 +188,7 @@ export default function PlaceMap({ room }: { room: Room }) {
         zIndex: on ? 100 : 1,
         icon: {
           // the selected marker gets a pulsing halo (.pin.on::after in index.css)
-          content: `<div class="${on ? 'pin on' : 'pin'}" style="--c:${STATUS_COLOR[p.status]};position:relative;width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 1px 4px rgb(28 36 48 / .45)"></div>`,
+          content: `<div class="${on ? 'pin on' : 'pin'}" style="--c:${STATUS_COLOR[p.status]};position:relative;width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 1px 4px rgb(28 36 48 / .45)"><span class="pin-name">${escapeHtml(p.name)}</span></div>`,
           anchor: new naver.maps.Point(size / 2, size / 2),
         },
       })

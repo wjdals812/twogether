@@ -299,6 +299,35 @@ p {
   background: var(--visited);
 }
 
+/* place name under a map marker; white outline keeps it readable over the map */
+.pin-name {
+  display: none; /* shown only when the map is zoomed in, see .zoomed below */
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  width: max-content;
+  max-width: 84px;
+  overflow: hidden;
+  transform: translateX(-50%);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  word-break: keep-all; /* break between words, not inside a Korean word */
+  overflow-wrap: break-word; /* a single very long word still wraps */
+  text-wrap: balance; /* two lines of similar length */
+  -webkit-line-clamp: 2; /* two lines, then an ellipsis */
+  -webkit-box-orient: vertical;
+  pointer-events: none;
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 4px #fff;
+}
+.zoomed .pin-name {
+  display: -webkit-box;
+}
+.pin.on .pin-name {
+  font-weight: 700;
+}
 /* selected map marker: a halo that keeps pulsing outward */
 .pin.on::after {
   content: '';

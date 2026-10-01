@@ -25,17 +25,22 @@ export default function App() {
     return () => data.subscription.unsubscribe()
   }, [])
 
+  // a room is renamed by another member without any event reaching us, so reload when the user looks at the room list
+  async function loadRooms() {
+    const { data } = await supabase.from('room_members').select('rooms(id, invite_code, name, created_at)')
+    const list = (data ?? []).map((m) => m.rooms as unknown as Room)
+    list.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    setRooms((prev) => (data ? list : (prev ?? [])))
+  }
+
   const uid = session?.user.id
   useEffect(() => {
     setRooms(undefined)
     if (!uid) return
-    supabase
-      .from('room_members')
-      .select('rooms(id, invite_code, name, created_at)')
-      .then(({ data }) => {
-        const list = (data ?? []).map((m) => m.rooms as unknown as Room)
-        setRooms(list.sort((a, b) => a.created_at.localeCompare(b.created_at)))
-      })
+    loadRooms()
+    const onVisible = () => document.visibilityState === 'visible' && loadRooms()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [uid])
 
   function switchTo(id: string) {
@@ -62,6 +67,7 @@ export default function App() {
       room={room}
       rooms={rooms}
       onSwitch={switchTo}
+      onRefresh={loadRooms}
       onRoom={joined}
       onRename={(name) => setRooms(rooms.map((r) => (r.id === room.id ? { ...r, name } : r)))}
       onLeave={() => setRooms(rooms.filter((r) => r.id !== room.id))}

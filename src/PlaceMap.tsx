@@ -35,10 +35,11 @@ const stamp = (iso: string) => {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const isTemp =(p: Saved) => p.id.startsWith('tmp:')
 
-export default function PlaceMap({ room, rooms, onSwitch, onRoom, onRename, onLeave }: {
+export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onRename, onLeave }: {
   room: Room
   rooms: Room[]
   onSwitch: (id: string) => void
+  onRefresh: () => void
   onRoom: (r: Room) => void
   onRename: (name: string) => void
   onLeave: () => void
@@ -349,6 +350,11 @@ ${warning}`)) return
     }
   }
 
+  const showRooms = () => {
+    setView('rooms')
+    onRefresh()
+  }
+
   async function rename(draft: string) {
     const name = draft.trim()
     setRenaming(null)
@@ -440,7 +446,7 @@ ${warning}`)) return
         <button
           className="panel dock"
           onClick={() => {
-            setView('rooms')
+            showRooms()
             setListOpen(true)
           }}
           aria-label={`${room.name} 방 열기. ${STATUS_LABEL.want} ${wantCount}곳, ${STATUS_LABEL.visited} ${visitedCount}곳`}
@@ -526,7 +532,7 @@ ${warning}`)) return
             <>
               <div className="sheet-head">
                 <h2>
-                  <button className="btn btn-ghost btn-icon" aria-label="방 목록" onClick={() => setView('rooms')}>
+                  <button className="btn btn-ghost btn-icon" aria-label="방 목록" onClick={showRooms}>
                     <Icon d="M15 6l-6 6 6 6" />
                   </button>
                   새 방 만들기
@@ -548,7 +554,7 @@ ${warning}`)) return
             <>
           <div className="sheet-head">
             <h2>
-              <button className="btn btn-ghost btn-icon" aria-label="방 목록" onClick={() => setView('rooms')}>
+              <button className="btn btn-ghost btn-icon" aria-label="방 목록" onClick={showRooms}>
                 <Icon d="M15 6l-6 6 6 6" />
               </button>
               {room.name}

@@ -69,6 +69,7 @@ export default function PlaceMap({ room, rooms, onSwitch, onRoom, onRename, onLe
   const [selected, setSelected] = useState<string | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [chatFor, setChatFor] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState<string | null>(null) // draft name while the rename dialog is open
   const [uid, setUid] = useState('')
 
   useEffect(() => {
@@ -348,8 +349,9 @@ ${warning}`)) return
     }
   }
 
-  async function rename() {
-    const name = window.prompt('방 이름', room.name)?.trim()
+  async function rename(draft: string) {
+    const name = draft.trim()
+    setRenaming(null)
     if (!name || name === room.name) return
     const { error } = await supabase.rpc('rename_room', { rid: room.id, new_name: name })
     if (error) setError(`이름 변경 실패: ${koError(error)}`)
@@ -642,7 +644,7 @@ ${warning}`)) return
               </ul>
             )}
             <div className="sheet-foot">
-              <button className="btn btn-ghost btn-sm" onClick={rename}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setRenaming(room.name)}>
                 이름 바꾸기
               </button>{' '}
               <button className="btn btn-ghost btn-sm danger" onClick={leave}>
@@ -653,6 +655,38 @@ ${warning}`)) return
             </>
           )}
         </section>
+      )}
+      {renaming !== null && (
+        <div className="modal center" onClick={() => setRenaming(null)}>
+          <form
+            className="panel modal-box dialog"
+            role="dialog"
+            aria-label="방 이름 바꾸기"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault()
+              rename(renaming)
+            }}
+          >
+            <h2>방 이름 바꾸기</h2>
+            <input
+              className="field"
+              autoFocus
+              maxLength={20}
+              value={renaming}
+              onChange={(e) => setRenaming(e.target.value)}
+              aria-label="방 이름"
+            />
+            <div className="dialog-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setRenaming(null)}>
+                취소
+              </button>
+              <button className="btn btn-primary" disabled={!renaming.trim() || renaming.trim() === room.name}>
+                저장
+              </button>
+            </div>
+          </form>
+        </div>
       )}
       {saved.find((p) => p.kakao_id === chatFor) && (
         <div className="modal" onClick={() => setChatFor(null)}>

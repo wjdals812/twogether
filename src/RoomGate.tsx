@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Brand from './Brand'
+import { koError } from './errors'
 import { supabase } from './supabase'
 
 export type Room = { id: string; invite_code: string }
@@ -11,7 +12,7 @@ export default function RoomGate({ onRoom }: { onRoom: (r: Room) => void }) {
   async function run(fn: 'create_room' | 'join_room') {
     setError('')
     const { data, error } = await supabase.rpc(fn, fn === 'join_room' ? { code } : undefined)
-    if (error) setError(error.message)
+    if (error) setError(koError(error))
     else onRoom(data)
   }
 

@@ -4,6 +4,7 @@ import type { Room } from './RoomGate'
 
 type Place = { id: string; place_name: string; address_name: string; x: string; y: string }
 type Status = 'want' | 'visited'
+type Comment = { id: string; place_id: string; user_id: string; body: string; created_at: string }
 type Saved = {
   id: string
   kakao_id: string
@@ -12,16 +13,23 @@ type Saved = {
   lat: number
   lng: number
   status: Status
-  memo: string
   rating: number | null
 }
 
-const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, memo, rating'
+const COLUMNS = 'id, kakao_id, name, address, lat, lng, status, rating'
 const STATUS_LABEL: Record<Status, string> = { want: '가고 싶어요', visited: '다녀왔어요' }
 const STATUS_COLOR: Record<Status, string> = { want: '#f4a798', visited: '#8fd2b0' } // keep in sync with --want / --visited in index.css
 // name only in the search box, the place's coordinates as map center so nearby matches rank first
 const naverLink = (name: string, lat: number, lng: number) =>
   `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=16.00,${lng},${lat},0,0,0,dh`
+const COMMENT_COLUMNS = 'id, place_id, user_id, body, created_at'
+// today: time only, other days: date only
+const stamp = (iso: string) => {
+  const d = new Date(iso)
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })
+}
 const isTemp = (p: Saved) => p.id.startsWith('tmp:')
 
 export default function PlaceMap({ room }: { room: Room }) {
@@ -36,6 +44,9 @@ export default function PlaceMap({ room }: { room: Room }) {
   const [listOpen, setListOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [chatFor, setChatFor] = useState<string | null>(null)
+  const [uid, setUid] = useState('')
 
   useEffect(() => {
     const m = new naver.maps.Map(el.current!, {
@@ -61,6 +72,28 @@ export default function PlaceMap({ room }: { room: Room }) {
         : [...prev, r],
     )
 
+  const addComment = (c: Comment) => setComments((prev) => (prev.some((x) => x.id === c.id) ? prev : [...prev, c]))
+
+  async function say(p: Saved, body: string) {
+    const { data, error } = await supabase
+      .from('place_comments')
+      .insert({ place_id: p.id, room_id: room.id, body })
+      .select(COMMENT_COLUMNS)
+      .single()
+    if (data) addComment(data)
+    else setError(`댓글 저장 실패: ${error?.message}`)
+  }
+
+  async function unsay(c: Comment) {
+    if (!window.confirm('삭제하시겠습니까?')) return
+    setComments((prev) => prev.filter((x) => x.id !== c.id))
+    const { error } = await supabase.from('place_comments').delete().eq('id', c.id)
+    if (error) {
+      addComment(c)
+      setError(`삭제 실패: ${error.message}`)
+    }
+  }
+
   async function load() {
     const { data, error } = await supabase
       .from('places')
@@ -68,6 +101,12 @@ export default function PlaceMap({ room }: { room: Room }) {
       .eq('room_id', room.id)
       .order('created_at')
     if (error) return setError(`불러오기 실패: ${error.message}`)
+    const c = await supabase
+      .from('place_comments')
+      .select(COMMENT_COLUMNS)
+      .eq('room_id', room.id)
+      .order('created_at')
+    if (c.data) setComments(c.data)
     // replace with the server state (drops rows deleted elsewhere) but keep rows still being added
     setSaved((prev) => [
       ...data,
@@ -76,6 +115,7 @@ export default function PlaceMap({ room }: { room: Room }) {
   }
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? ''))
     load()
 
     const table = { schema: 'public', table: 'places' }
@@ -90,6 +130,12 @@ export default function PlaceMap({ room }: { room: Room }) {
       // DELETE events can't be filtered by room (old row only carries the id), but we only drop ids we hold
       .on('postgres_changes', { event: 'DELETE', ...table }, (e) =>
         setSaved((prev) => prev.filter((p) => p.id !== e.old.id)),
+      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'place_comments', filter: `room_id=eq.${room.id}` }, (e) =>
+        addComment(e.new as Comment),
+      )
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'place_comments' }, (e) =>
+        setComments((prev) => prev.filter((c) => c.id !== e.old.id)),
       )
       // events missed while disconnected (iOS suspends background apps) are not replayed, so reload on (re)connect
       .subscribe((status) => status === 'SUBSCRIBED' && load())
@@ -116,7 +162,7 @@ export default function PlaceMap({ room }: { room: Room }) {
         title: p.name,
         zIndex: p.kakao_id === selected ? 100 : 1,
         icon: {
-          content: `<div style="width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:3px solid #fff;box-shadow:0 1px 4px rgb(28 36 48 / .45)"></div>`,
+          content: `<div style="width:${size}px;height:${size}px;box-sizing:border-box;border-radius:50%;background:${STATUS_COLOR[p.status]};border:2px solid #fff;box-shadow:0 1px 4px rgb(28 36 48 / .45)"></div>`,
           anchor: new naver.maps.Point(size / 2, size / 2),
         },
       })
@@ -177,7 +223,6 @@ export default function PlaceMap({ room }: { room: Room }) {
       lat: +p.y,
       lng: +p.x,
       status: 'want',
-      memo: '',
       rating: null,
     })
     const { data, error } = await supabase
@@ -199,7 +244,7 @@ export default function PlaceMap({ room }: { room: Room }) {
     }
   }
 
-  async function patch(p: Saved, fields: Partial<Pick<Saved, 'status' | 'memo' | 'rating'>>) {
+  async function patch(p: Saved, fields: Partial<Pick<Saved, 'status' | 'rating'>>) {
     merge({ ...p, ...fields })
     const { error } = await supabase.from('places').update(fields).eq('id', p.id)
     if (error) {
@@ -385,15 +430,9 @@ export default function PlaceMap({ room }: { room: Room }) {
                         ))}
                       </div>
                     </div>
-                    <input
-                      key={p.memo}
-                      className="field memo"
-                      defaultValue={p.memo}
-                      disabled={isTemp(p)}
-                      placeholder="메모"
-                      aria-label={`${p.name} 메모`}
-                      onBlur={(e) => e.target.value !== p.memo && patch(p, { memo: e.target.value })}
-                    />
+                    <button className="chat-open" disabled={isTemp(p)} onClick={() => setChatFor(p.kakao_id)}>
+                      💬 대화 {comments.filter((c) => c.place_id === p.id).length || '시작하기'}
+                    </button>
                     <div className="place-foot">
                       <a href={naverLink(p.name, p.lat, p.lng)} target="_blank" rel="noopener noreferrer">
                         네이버 지도에서 보기 ↗
@@ -414,6 +453,70 @@ export default function PlaceMap({ room }: { room: Room }) {
           </div>
         </section>
       )}
+      {saved.find((p) => p.kakao_id === chatFor) && (
+        <div className="modal" onClick={() => setChatFor(null)}>
+          <div className="panel modal-box" role="dialog" aria-label="대화" onClick={(e) => e.stopPropagation()}>
+            {(() => {
+              const p = saved.find((x) => x.kakao_id === chatFor)!
+              return (
+                <>
+                  <div className="sheet-head">
+                    <h2>{p.name}</h2>
+                    <button className="btn btn-ghost btn-icon" aria-label="닫기" onClick={() => setChatFor(null)}>
+                      <Icon d="M6 6l12 12M18 6 6 18" />
+                    </button>
+                  </div>
+                  <Thread
+                    comments={comments.filter((c) => c.place_id === p.id)}
+                    uid={uid}
+                    onSend={(body) => say(p, body)}
+                    onDelete={unsay}
+                  />
+                </>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Thread({ comments, uid, onSend, onDelete }: {
+  comments: Comment[]
+  uid: string
+  onSend: (body: string) => void
+  onDelete: (c: Comment) => void
+}) {
+  const [text, setText] = useState('')
+  const send = (e: React.FormEvent) => {
+    e.preventDefault()
+    const body = text.trim()
+    if (!body) return
+    onSend(body)
+    setText('')
+  }
+  return (
+    <div className="chat" ref={(el) => el?.scrollTo(0, el.scrollHeight)}>
+      {comments.map((c) => (
+        <div key={c.id} className={c.user_id === uid ? 'msg mine' : 'msg'}>
+          <div className="bubble">{c.body}</div>
+          <div className="meta">
+            <time>{stamp(c.created_at)}</time>
+            {c.user_id === uid && (
+              <button aria-label="내 글 삭제" onClick={() => onDelete(c)}>
+                삭제
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      <form className="chat-form" onSubmit={send}>
+        <input className="field" value={text} onChange={(e) => setText(e.target.value)} placeholder="여기 어때?" aria-label="댓글" />
+        <button className="btn btn-sm btn-primary" disabled={!text.trim()}>
+          보내기
+        </button>
+      </form>
     </div>
   )
 }

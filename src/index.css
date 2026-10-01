@@ -429,11 +429,110 @@ p {
 .stars button.on {
   color: #f3c969;
 }
-.memo {
-  min-height: 42px;
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 10px;
-  border-color: transparent;
+}
+.msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 85%;
+  align-self: flex-start;
+}
+.msg.mine {
+  align-items: flex-end;
+  align-self: flex-end;
+}
+.meta {
+  display: flex;
+  gap: 8px;
+  margin: 2px 6px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.meta button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+.bubble {
+  padding: 9px 14px;
+  border-radius: 20px 20px 20px 6px;
+  background: #e9e9eb;
+  color: #1c1c1e;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.msg.mine .bubble {
+  border-radius: 20px 20px 6px 20px;
+  background: #0a84ff;
+  color: #fff;
+}
+.chat-form {
+  display: flex;
+  gap: 6px;
+}
+.chat-form .field {
+  border-radius: 999px;
+  padding-inline: 16px;
+  flex: 1;
+  min-width: 0;
+}
+.chat-open {
+  border-radius: 999px;
+  margin-top: 10px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
   background: var(--field);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chat-open:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.modal {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(28 36 48 / 0.4);
+  animation: fade 0.2s ease-out;
+}
+.modal-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100%);
+  max-height: 80dvh;
+  border-radius: 28px 28px 0 0;
+  animation: rise 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+.modal-box .chat {
+  margin: 0;
+  padding: 0 18px 16px;
+  overflow-y: auto;
 }
 .place-foot {
   display: flex;
@@ -445,8 +544,4 @@ p {
 .sheet-foot {
   padding: 8px 18px 0;
   text-align: center;
-}
-.place.selected .memo {
-  border-color: var(--line);
-  background: var(--surface);
 }

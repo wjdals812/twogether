@@ -6,6 +6,7 @@ drop table if exists rooms cascade;
 drop function if exists is_member(uuid);
 drop function if exists create_room();
 drop function if exists join_room(text);
+drop function if exists update_place(uuid, jsonb);
 
 create table rooms (
   id uuid primary key default gen_random_uuid(),
@@ -97,6 +98,18 @@ end $$;
 
 revoke execute on function create_room, join_room from public, anon;
 grant execute on function create_room, join_room to authenticated;
+
+-- POST-based fallback for browsers/networks that block PATCH. security invoker: RLS still applies.
+create function update_place(pid uuid, fields jsonb) returns void
+language sql security invoker set search_path = public as $$
+  update places set
+    status = coalesce(fields->>'status', status),
+    rating = case when fields ? 'rating' then (fields->>'rating')::smallint else rating end
+  where id = pid
+$$;
+
+revoke execute on function update_place from public, anon;
+grant execute on function update_place to authenticated;
 
 alter publication supabase_realtime add table places;
 alter publication supabase_realtime add table place_comments;

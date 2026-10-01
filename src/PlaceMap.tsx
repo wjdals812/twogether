@@ -94,7 +94,10 @@ export default function PlaceMap({ room }: { room: Room }) {
     }
   }
 
+  const edits = useRef(0) // bumped by patch(); a load that started before an edit must not overwrite it
+
   async function load() {
+    const startedAt = edits.current
     const { data, error } = await supabase
       .from('places')
       .select(COLUMNS)
@@ -107,6 +110,7 @@ export default function PlaceMap({ room }: { room: Room }) {
       .eq('room_id', room.id)
       .order('created_at')
     if (c.data) setComments(c.data)
+    if (edits.current !== startedAt) return // realtime delivers the edit's result
     // replace with the server state (drops rows deleted elsewhere) but keep rows still being added
     setSaved((prev) => [
       ...data,
@@ -245,8 +249,12 @@ export default function PlaceMap({ room }: { room: Room }) {
   }
 
   async function patch(p: Saved, fields: Partial<Pick<Saved, 'status' | 'rating'>>) {
+    edits.current++
     merge({ ...p, ...fields })
-    const { error } = await supabase.from('places').update(fields).eq('id', p.id)
+    let { error } = await supabase.from('places').update(fields).eq('id', p.id)
+    // some browsers/networks block PATCH (CORS preflight fails, no error code): retry as POST via rpc
+    if (error && !error.code) ({ error } = await supabase.rpc('update_place', { pid: p.id, fields }))
+    edits.current++
     if (error) {
       merge(p)
       setError(`수정 실패: ${error.message}`)

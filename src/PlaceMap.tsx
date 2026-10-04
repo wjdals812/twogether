@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import Course from './Course'
+import Course, { type Stop } from './Course'
 import { koError } from './errors'
 import { supabase } from './supabase'
 import { RoomForm, type Room } from './RoomGate'
+import SavedCourses from './SavedCourses'
 
 type Place = { id: string; place_name: string; address_name: string; x: string; y: string }
 type Status = 'want' | 'visited'
@@ -72,6 +73,7 @@ export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onR
   const [comments, setComments] = useState<Comment[]>([])
   const [chatFor, setChatFor] = useState<string | null>(null)
   const [courseOpen, setCourseOpen] = useState(false)
+  const [savedCoursesOpen, setSavedCoursesOpen] = useState(false)
   const [renaming, setRenaming] = useState<string | null>(null) // draft name while the rename dialog is open
   const [uid, setUid] = useState('')
 
@@ -324,6 +326,14 @@ export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onR
     map.current!.panTo(new naver.maps.LatLng(p.lat, p.lng))
     setSelected(p.kakao_id)
     closeList()
+  }
+
+  // a stop of a course: close the course windows and show the place on the map (a place deleted since then just closes them)
+  function pickStop(s: Stop) {
+    const p = saved.find((x) => x.name === s.name && x.address === s.address)
+    setCourseOpen(false)
+    setSavedCoursesOpen(false)
+    if (p) focusPlace(p)
   }
 
   async function remove(p: Saved) {
@@ -580,9 +590,14 @@ ${warning}`)) return
                 {copied ? '복사됨' : '복사'}
               </button>
             </div>
-            <button className="btn course-open" disabled={wantCount < 2} onClick={() => setCourseOpen(true)}>
-              ✨ 코스 짜기{wantCount < 2 && ' (가보자 장소 2곳 이상)'}
-            </button>
+            <div className="course-actions">
+              <button className="btn" disabled={wantCount < 2} onClick={() => setCourseOpen(true)}>
+                ✨ 코스 짜기{wantCount < 2 && ' (가보자 2곳 이상)'}
+              </button>
+              <button className="btn" onClick={() => setSavedCoursesOpen(true)}>
+                📌 저장한 코스
+              </button>
+            </div>
             {saved.length > 1 && (
               <select
                 className="sort"
@@ -667,16 +682,9 @@ ${warning}`)) return
           )}
         </section>
       )}
-      {courseOpen && (
-        <Course
-          roomId={room.id}
-          onClose={() => setCourseOpen(false)}
-          onPick={(s) => {
-            const p = saved.find((x) => x.name === s.name && x.address === s.address)
-            setCourseOpen(false)
-            if (p) focusPlace(p)
-          }}
-        />
+      {courseOpen && <Course roomId={room.id} onClose={() => setCourseOpen(false)} onPick={pickStop} />}
+      {savedCoursesOpen && (
+        <SavedCourses roomId={room.id} onClose={() => setSavedCoursesOpen(false)} onPick={pickStop} />
       )}
       {renaming !== null && (
         <div className="modal center" onClick={() => setRenaming(null)}>

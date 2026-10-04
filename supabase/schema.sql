@@ -1,4 +1,5 @@
 -- Full schema. Re-running wipes `places` (dev data only).
+drop table if exists room_courses cascade;
 drop table if exists place_comments cascade;
 drop table if exists places cascade;
 drop table if exists room_members cascade;
@@ -48,6 +49,16 @@ create table place_comments (
 );
 create index on place_comments (place_id, created_at);
 
+create table room_courses (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references rooms on delete cascade,
+  summary text not null default '' check (char_length(summary) <= 500),
+  stops jsonb not null check (jsonb_typeof(stops) = 'array' and jsonb_array_length(stops) between 1 and 10),
+  created_by uuid not null default auth.uid() references auth.users,
+  created_at timestamptz not null default now()
+);
+create index on room_courses (room_id, created_at desc);
+
 -- security definer avoids RLS recursion when policies check membership
 create function is_member(rid uuid) returns boolean
 language sql security definer set search_path = public stable as $$
@@ -58,6 +69,7 @@ alter table rooms enable row level security;
 alter table room_members enable row level security;
 alter table places enable row level security;
 alter table place_comments enable row level security;
+alter table room_courses enable row level security;
 
 create policy "members read room" on rooms for select using (is_member(id));
 create policy "members read members" on room_members for select using (is_member(room_id));
@@ -67,6 +79,10 @@ create policy "members read comments" on place_comments for select using (is_mem
 create policy "members add comments" on place_comments for insert
   with check (is_member(room_id) and user_id = auth.uid());
 create policy "authors delete comments" on place_comments for delete using (user_id = auth.uid());
+create policy "members read courses" on room_courses for select using (is_member(room_id));
+create policy "members add courses" on room_courses for insert
+  with check (is_member(room_id) and created_by = auth.uid());
+create policy "members delete courses" on room_courses for delete using (is_member(room_id));
 -- no insert policies on rooms/room_members: only the functions below can write them
 
 create function create_room(room_name text default '새 방') returns rooms

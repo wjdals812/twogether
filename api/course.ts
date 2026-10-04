@@ -78,5 +78,6 @@ export async function POST(request: Request) {
     console.error('gemini returned no usable stops', text.slice(0, 500))
     return fail('ai_failed', 502)
   }
-  return Response.json({ summary: typeof plan.summary === 'string' ? plan.summary : '', stops })
+  // the caps keep a saved course inside the room_courses table checks
+  return Response.json({ summary: typeof plan.summary === 'string' ? plan.summary.slice(0, 200) : '', stops: stops.slice(0, 8) })
 }

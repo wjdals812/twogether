@@ -672,10 +672,41 @@ p {
   gap: 8px;
   justify-content: flex-end;
 }
-.course-open {
-  display: block;
-  width: calc(100% - 32px);
+.course-actions {
+  display: flex;
+  gap: 8px;
   margin: 0 16px 8px;
+}
+.course-actions .btn {
+  flex: 1;
+}
+.saved-courses {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.saved-courses button {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.saved-courses small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
 }
 .course-hint,
 .course-summary {

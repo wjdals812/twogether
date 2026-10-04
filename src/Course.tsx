@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { supabase } from './supabase'
 
-type Stop = { name: string; address: string; note: string; m?: number } // m: meters from the previous stop
-type Plan = { summary: string; stops: Stop[] }
+export type Stop = { name: string; address: string; note: string; m?: number } // m: meters from the previous stop
+export type Plan = { summary: string; stops: Stop[] }
 
 // straight-line distance x1.3 for winding streets, 80 m per minute; too far to walk shows the distance instead
 const gap = (m: number) => {
@@ -16,6 +16,27 @@ const MESSAGES: Record<string, string> = {
   unauthorized: '로그인이 만료됐습니다. 다시 로그인해 주세요.',
 }
 
+// the stops of a course as a timeline (used for a fresh course and for a saved one)
+export function Timeline({ stops, onPick }: { stops: Stop[]; onPick: (s: Stop) => void }) {
+  return (
+    <ol className="course">
+      {stops.map((s, i) => (
+        <li key={s.name + s.address}>
+          {/* the time to the next stop hangs off this row, see .course-gap */}
+          {stops[i + 1]?.m !== undefined && <span className="course-gap">{gap(stops[i + 1].m!)}</span>}
+          <button type="button" onClick={() => onPick(s)}>
+            <b aria-hidden="true" />
+            <span>
+              {s.name}
+              {s.note && <small>{s.note}</small>}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 // asks /api/course for a route through the room's saved "가보자" places
 export default function Course({ roomId, onPick, onClose }: {
   roomId: string
@@ -25,6 +46,7 @@ export default function Course({ roomId, onPick, onClose }: {
   const [wish, setWish] = useState('')
   const [busy, setBusy] = useState(false)
   const [plan, setPlan] = useState<Plan | null>(null)
+  const [keep, setKeep] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState('')
 
   async function ask() {
@@ -38,13 +60,27 @@ export default function Course({ roomId, onPick, onClose }: {
         body: JSON.stringify({ room_id: roomId, wish }),
       })
       const body = await res.json().catch(() => ({}))
-      if (res.ok) setPlan(body)
-      else setError(MESSAGES[body.error] ?? '코스를 만들지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
+      if (res.ok) {
+        setPlan(body)
+        setKeep('idle')
+      } else setError(MESSAGES[body.error] ?? '코스를 만들지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
     } catch {
       setError('코스를 만들지 못했습니다. 네트워크를 확인해 주세요.')
     } finally {
       setBusy(false)
     }
+  }
+
+  // saved for the whole room, as a snapshot of what is on screen
+  async function save() {
+    if (!plan || keep !== 'idle') return
+    setKeep('saving')
+    setError('')
+    const { error } = await supabase.from('room_courses').insert({ room_id: roomId, summary: plan.summary, stops: plan.stops })
+    if (error) {
+      setKeep('idle')
+      setError('저장하지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
+    } else setKeep('saved')
   }
 
   return (
@@ -63,24 +99,14 @@ export default function Course({ roomId, onPick, onClose }: {
         {plan ? (
           <>
             {plan.summary && <p className="course-summary">{plan.summary}</p>}
-            <ol className="course">
-              {plan.stops.map((s, i) => (
-                <li key={s.name + s.address}>
-                  {/* the time to the next stop hangs off this row, see .course-gap */}
-                  {plan.stops[i + 1]?.m !== undefined && <span className="course-gap">{gap(plan.stops[i + 1].m!)}</span>}
-                  <button type="button" onClick={() => onPick(s)}>
-                    <b aria-hidden="true" />
-                    <span>
-                      {s.name}
-                      {s.note && <small>{s.note}</small>}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
+            <Timeline stops={plan.stops} onPick={onPick} />
+            {error && <p className="error">{error}</p>}
             <div className="dialog-actions">
               <button type="button" className="btn btn-ghost" onClick={() => setPlan(null)}>
                 다시 짜기
+              </button>
+              <button type="button" className="btn" disabled={keep !== 'idle'} onClick={save}>
+                {keep === 'saved' ? '저장됨' : keep === 'saving' ? '저장 중…' : '저장'}
               </button>
               <button type="button" className="btn btn-primary" onClick={onClose}>
                 닫기

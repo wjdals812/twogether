@@ -8,15 +8,18 @@
 
 <p>
   <img src="docs/screenshots/01-login.png" alt="로그인 화면" width="200">
-  <img src="docs/screenshots/02-map.png" alt="저장한 장소가 마커로 찍힌 지도" width="200">
-  <img src="docs/screenshots/03-search.png" alt="장소 검색 결과" width="200">
+  <img src="docs/screenshots/02-rooms.png" alt="방 목록: 연인용, 친구용처럼 방을 나눠 씀" width="200">
+  <img src="docs/screenshots/03-room.jpg" alt="방 안 화면: 초대 코드, 장소 목록, 코스 짜기" width="200">
+  <img src="docs/screenshots/04-map.png" alt="저장한 장소가 마커로 찍힌 지도" width="200">
 </p>
 <p>
-  <img src="docs/screenshots/04-list.jpg" alt="별점 높은순으로 정렬한 저장 목록: 상태, 별점, 대화" width="200">
-  <img src="docs/screenshots/05-chat.png" alt="장소별 대화 말풍선" width="200">
+  <img src="docs/screenshots/05-search.png" alt="장소 검색 결과" width="200">
+  <img src="docs/screenshots/06-chat.png" alt="장소별 대화 말풍선" width="200">
+  <img src="docs/screenshots/07-course.png" alt="AI가 짠 코스 타임라인과 도보 시간" width="200">
+  <img src="docs/screenshots/08-saved-courses.png" alt="방에 저장한 코스 목록" width="200">
 </p>
 
-로그인, 지도와 마커, 장소 검색, 저장한 장소 목록(별점순), 장소별 대화 순서입니다. 아이폰 홈 화면 앱에서 캡처했습니다.
+로그인, 방 목록, 방 안 화면, 지도와 마커, 장소 검색, 장소별 대화, AI 코스, 저장한 코스 순서입니다. 아이폰 홈 화면 앱에서 캡처했습니다.
 
 ## 만든 이유
 

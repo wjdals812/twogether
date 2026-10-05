@@ -35,6 +35,20 @@ export async function POST(request: Request) {
   const data: { name: string; address: string; lat: number; lng: number; rating: number | null }[] = await rows.json()
   if (data.length < 2) return fail('too_few', 400)
 
+  // usage limits live in the database (take_course_call): it counts and records the call in one step.
+  // ponytail: a call that fails at Gemini still counts; refund it if that ever annoys real users
+  const taken = await fetch(`${process.env.VITE_SUPABASE_URL}/rest/v1/rpc/take_course_call`, {
+    method: 'POST',
+    headers: { apikey: process.env.VITE_SUPABASE_ANON_KEY!, authorization: auth, 'content-type': 'application/json' },
+    body: '{}',
+  })
+  const verdict = taken.ok ? await taken.json() : null
+  if (verdict !== 'ok') {
+    if (verdict === 'too_fast' || verdict === 'user_limit' || verdict === 'site_limit') return fail(verdict, 429)
+    console.error('take_course_call', taken.status, JSON.stringify(verdict)) // not applied yet, or the database is down: do not spend Gemini quota unmetered
+    return fail('limit_check_failed', 500)
+  }
+
   const list = data
     .map((p, i) => `${i}. ${p.name} (${p.address}) ${p.lat.toFixed(4)},${p.lng.toFixed(4)}${p.rating ? ` rating ${p.rating}/5` : ''}`)
     .join('\n')

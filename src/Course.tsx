@@ -14,6 +14,9 @@ const MESSAGES: Record<string, string> = {
   too_few: '가보자 장소가 2곳 이상 있어야 코스를 짤 수 있어요.',
   not_configured: 'AI 기능이 아직 설정되지 않았습니다.',
   unauthorized: '로그인이 만료됐습니다. 다시 로그인해 주세요.',
+  too_fast: '너무 빨라요. 몇 초 뒤에 다시 눌러 주세요.',
+  user_limit: '오늘 쓸 수 있는 코스 짜기 횟수를 모두 썼어요. 내일 다시 해 주세요.',
+  site_limit: '오늘은 코스 짜기 이용이 많아 잠시 쉬어요. 내일 다시 해 주세요.',
 }
 
 // the stops of a course as a timeline (used for a fresh course and for a saved one)

@@ -1,4 +1,5 @@
 -- Full schema. Re-running wipes `places` (dev data only).
+drop table if exists course_calls cascade;
 drop table if exists room_courses cascade;
 drop table if exists place_comments cascade;
 drop table if exists places cascade;
@@ -10,6 +11,7 @@ drop function if exists join_room(text);
 drop function if exists leave_room(uuid);
 drop function if exists rename_room(uuid, text);
 drop function if exists update_place(uuid, jsonb);
+drop function if exists take_course_call();
 
 create table rooms (
   id uuid primary key default gen_random_uuid(),
@@ -59,6 +61,14 @@ create table room_courses (
 );
 create index on room_courses (room_id, created_at desc);
 
+create table course_calls (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index on course_calls (user_id, created_at desc);
+create index on course_calls (created_at);
+
 -- security definer avoids RLS recursion when policies check membership
 create function is_member(rid uuid) returns boolean
 language sql security definer set search_path = public stable as $$
@@ -70,6 +80,7 @@ alter table room_members enable row level security;
 alter table places enable row level security;
 alter table place_comments enable row level security;
 alter table room_courses enable row level security;
+alter table course_calls enable row level security; -- no policies: only take_course_call() touches it
 
 create policy "members read room" on rooms for select using (is_member(id));
 create policy "members read members" on room_members for select using (is_member(room_id));
@@ -133,6 +144,30 @@ end $$;
 
 revoke execute on function create_room, join_room, leave_room, rename_room from public, anon;
 grant execute on function create_room, join_room, leave_room, rename_room to authenticated;
+
+-- Limits for the AI course function: 10 seconds between calls, 15 per user and 200 for the whole site in a rolling day.
+create function take_course_call() returns text
+language plpgsql security definer set search_path = public as $
+declare uid uuid := auth.uid();
+begin
+  if uid is null then raise exception 'not logged in'; end if;
+  perform pg_advisory_xact_lock(hashtext('course_calls')); -- one caller at a time, so parallel requests cannot slip past a limit
+  delete from course_calls where created_at < now() - interval '2 days';
+  if exists (select 1 from course_calls where user_id = uid and created_at > now() - interval '10 seconds') then
+    return 'too_fast';
+  end if;
+  if (select count(*) from course_calls where user_id = uid and created_at > now() - interval '1 day') >= 15 then
+    return 'user_limit';
+  end if;
+  if (select count(*) from course_calls where created_at > now() - interval '1 day') >= 200 then
+    return 'site_limit';
+  end if;
+  insert into course_calls (user_id) values (uid);
+  return 'ok';
+end $;
+
+revoke execute on function take_course_call from public, anon;
+grant execute on function take_course_call to authenticated;
 
 -- POST-based fallback for browsers/networks that block PATCH. security invoker: RLS still applies.
 create function update_place(pid uuid, fields jsonb) returns void

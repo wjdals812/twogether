@@ -41,7 +41,7 @@
 
 | 영역 | 사용 기술 |
 |---|---|
-| 프론트엔드 | React, TypeScript, Vite |
+| 프론트엔드 | React, TypeScript, Vite, React Query (코스 화면의 서버 상태) |
 | 지도 | 네이버 Dynamic Map (Maps JS v3) |
 | 장소 검색 | 카카오 로컬 API (키워드 검색) |
 | 백엔드 | Supabase: Postgres, Auth, Realtime, Row Level Security, SQL 함수 |

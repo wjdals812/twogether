@@ -179,6 +179,14 @@
 - 시험: 가짜 서버로 세 가지 한도가 각각 429를 내고 Gemini까지 가지 않는지, 한도 확인 실패 시 막히는지, 장소 부족 요청은 횟수를 쓰지 않는지, 요청 한 번에 한 번만 세는지 확인했다. SQL은 로컬에서 실행하지 못했다.
 - 한계: Gemini가 실패한 호출도 횟수에 포함된다. 이메일 인증 없이 가입되므로 계정을 여러 개 만들면 사용자당 한도는 피할 수 있고, 그래서 전체 한도를 둔다.
 
+### 21. React Query 도입 (코스 화면 한정)
+- 코스 짜기와 저장한 코스 화면이 `busy`, `keep`('idle'/'saving'/'saved'), `error`, `list`를 `useState`와 `useEffect`로 직접 관리하고 있어서, 서버 호출의 로딩·에러·갱신을 `@tanstack/react-query`로 맡겼다.
+- [SavedCourses.tsx](../src/SavedCourses.tsx): 목록은 `useQuery(['courses', roomId])`, 삭제는 `useMutation`이고 성공하면 캐시에서 그 항목만 뺀다. 삭제 직후 목록을 다시 받지 않아도 바로 사라진다.
+- [Course.tsx](../src/Course.tsx): AI 코스 생성과 저장을 각각 `useMutation`으로 바꿨다. 로딩·성공·실패는 `isPending`, `isSuccess`, `isError`로 보고, 저장이 성공하면 `['courses', roomId]` 캐시를 무효화한다. 한도 초과 같은 서버 사유 문구(`MESSAGES`)는 그대로 쓰고 `Error.message`로 넘긴다.
+- 달라진 동작: 창이 다시 포커스를 받으면 저장한 코스 목록을 자동으로 다시 불러온다(React Query 기본값).
+- **PlaceMap은 일부러 적용하지 않았다.** 장소와 댓글이 Supabase Realtime 이벤트로 들어오고, `edits` ref와 임시 행(`isTemp`) 병합으로 직접 만든 낙관적 업데이트가 이미 있다. 여기에 React Query 캐시를 얹으면 실시간 이벤트와 캐시가 서로 덮어쓰는 문제를 새로 풀어야 해서 이득보다 복잡함이 컸다. `App.tsx`, `RoomGate.tsx`, `Auth.tsx`는 호출이 한두 번뿐이라 뺐다.
+- 시험: 코스 생성, 저장(저장 중에서 저장됨으로 바뀌고 버튼 비활성), 저장 후 목록 맨 위에 표시, 삭제 후 즉시 사라짐, 10초 안에 다시 요청하면 "너무 빨라요" 문구가 뜨는 것을 직접 확인했다.
+
 ## 문제 해결 기록
 
 | 상황 | 원인 | 해결 |

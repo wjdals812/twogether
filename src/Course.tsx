@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 
 export type Stop = { name: string; address: string; note: string; m?: number } // m: meters from the previous stop
@@ -46,45 +47,38 @@ export default function Course({ roomId, onPick, onClose }: {
   onPick: (s: Stop) => void
   onClose: () => void
 }) {
+  const queryClient = useQueryClient()
   const [wish, setWish] = useState('')
-  const [busy, setBusy] = useState(false)
   const [plan, setPlan] = useState<Plan | null>(null)
-  const [keep, setKeep] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [error, setError] = useState('')
 
-  async function ask() {
-    setBusy(true)
-    setError('')
-    try {
+  const ask = useMutation({
+    mutationFn: async () => {
       const { data } = await supabase.auth.getSession()
       const res = await fetch('/api/course', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${data.session?.access_token}` },
         body: JSON.stringify({ room_id: roomId, wish }),
+      }).catch(() => {
+        throw new Error('코스를 만들지 못했습니다. 네트워크를 확인해 주세요.')
       })
       const body = await res.json().catch(() => ({}))
-      if (res.ok) {
-        setPlan(body)
-        setKeep('idle')
-      } else setError(MESSAGES[body.error] ?? '코스를 만들지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
-    } catch {
-      setError('코스를 만들지 못했습니다. 네트워크를 확인해 주세요.')
-    } finally {
-      setBusy(false)
-    }
-  }
+      if (!res.ok) throw new Error(MESSAGES[body.error] ?? '코스를 만들지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
+      return body as Plan
+    },
+    onSuccess: (p) => {
+      setPlan(p)
+      save.reset()
+    },
+  })
 
   // saved for the whole room, as a snapshot of what is on screen
-  async function save() {
-    if (!plan || keep !== 'idle') return
-    setKeep('saving')
-    setError('')
-    const { error } = await supabase.from('room_courses').insert({ room_id: roomId, summary: plan.summary, stops: plan.stops })
-    if (error) {
-      setKeep('idle')
-      setError('저장하지 못했습니다. 잠시 뒤에 다시 시도해 주세요.')
-    } else setKeep('saved')
-  }
+  const save = useMutation({
+    mutationFn: async (p: Plan) => {
+      const { error } = await supabase.from('room_courses').insert({ room_id: roomId, summary: p.summary, stops: p.stops })
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['courses', roomId] }),
+  })
 
   return (
     <div className="modal center" onClick={onClose}>
@@ -95,7 +89,7 @@ export default function Course({ roomId, onPick, onClose }: {
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault()
-          if (!busy) ask()
+          if (!ask.isPending) ask.mutate()
         }}
       >
         <h2>✨ 코스 짜기</h2>
@@ -103,13 +97,13 @@ export default function Course({ roomId, onPick, onClose }: {
           <>
             {plan.summary && <p className="course-summary">{plan.summary}</p>}
             <Timeline stops={plan.stops} onPick={onPick} />
-            {error && <p className="error">{error}</p>}
+            {save.isError && <p className="error">저장하지 못했습니다. 잠시 뒤에 다시 시도해 주세요.</p>}
             <div className="dialog-actions">
               <button type="button" className="btn btn-ghost" onClick={() => setPlan(null)}>
                 다시 짜기
               </button>
-              <button type="button" className="btn" disabled={keep !== 'idle'} onClick={save}>
-                {keep === 'saved' ? '저장됨' : keep === 'saving' ? '저장 중…' : '저장'}
+              <button type="button" className="btn" disabled={save.isPending || save.isSuccess} onClick={() => save.mutate(plan)}>
+                {save.isSuccess ? '저장됨' : save.isPending ? '저장 중…' : '저장'}
               </button>
               <button type="button" className="btn btn-primary" onClick={onClose}>
                 닫기
@@ -128,13 +122,13 @@ export default function Course({ roomId, onPick, onClose }: {
               placeholder="원하는 분위기 (예: 반나절, 여유롭게)"
               aria-label="원하는 분위기"
             />
-            {error && <p className="error">{error}</p>}
+            {ask.isError && <p className="error">{ask.error.message}</p>}
             <div className="dialog-actions">
               <button type="button" className="btn btn-ghost" onClick={onClose}>
                 취소
               </button>
-              <button className="btn btn-primary" disabled={busy}>
-                {busy ? '짜는 중…' : '코스 짜기'}
+              <button className="btn btn-primary" disabled={ask.isPending}>
+                {ask.isPending ? '짜는 중…' : '코스 짜기'}
               </button>
             </div>
           </>

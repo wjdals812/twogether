@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Timeline, type Plan, type Stop } from './Course'
 import { supabase } from './supabase'
 
@@ -12,26 +13,35 @@ export default function SavedCourses({ roomId, onPick, onClose }: {
   onPick: (s: Stop) => void
   onClose: () => void
 }) {
-  const [list, setList] = useState<Saved[] | null>(null)
+  const queryClient = useQueryClient()
+  const queryKey = ['courses', roomId]
   const [open, setOpen] = useState<Saved | null>(null)
-  const [error, setError] = useState('')
 
-  useEffect(() => {
-    supabase
-      .from('room_courses')
-      .select('id, summary, stops, created_at')
-      .eq('room_id', roomId)
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => (error ? setError('불러오지 못했습니다.') : setList(data as Saved[])))
-  }, [roomId])
+  const { data: list, isError: loadFailed } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('room_courses')
+        .select('id, summary, stops, created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as Saved[]
+    },
+  })
 
-  async function remove(c: Saved) {
-    if (!window.confirm('이 코스를 삭제할까요?')) return
-    const { error } = await supabase.from('room_courses').delete().eq('id', c.id)
-    if (error) return setError('삭제하지 못했습니다.')
-    setList((prev) => prev?.filter((x) => x.id !== c.id) ?? null)
-    setOpen(null)
-  }
+  const remove = useMutation({
+    mutationFn: async (c: Saved) => {
+      const { error } = await supabase.from('room_courses').delete().eq('id', c.id)
+      if (error) throw error
+    },
+    onSuccess: (_, c) => {
+      queryClient.setQueryData<Saved[]>(queryKey, (prev) => prev?.filter((x) => x.id !== c.id))
+      setOpen(null)
+    },
+  })
+
+  const error = loadFailed ? '불러오지 못했습니다.' : remove.isError ? '삭제하지 못했습니다.' : ''
 
   return (
     <div className="modal center" onClick={onClose}>
@@ -43,7 +53,7 @@ export default function SavedCourses({ roomId, onPick, onClose }: {
             <Timeline stops={open.stops} onPick={onPick} />
             {error && <p className="error">{error}</p>}
             <div className="dialog-actions">
-              <button type="button" className="btn btn-ghost danger" onClick={() => remove(open)}>
+              <button type="button" className="btn btn-ghost danger" onClick={() => window.confirm('이 코스를 삭제할까요?') && remove.mutate(open)}>
                 삭제
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setOpen(null)}>

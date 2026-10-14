@@ -1,9 +1,26 @@
 import type { Session } from '@supabase/supabase-js'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import Auth from './Auth'
-import PlaceMap from './PlaceMap'
 import RoomGate, { type Room } from './RoomGate'
 import { supabase } from './supabase'
+
+// The naver map script and PlaceMap are only needed once the user is signed in, so the login screen does not wait for
+// them. loadMap() is called as soon as a session exists, in parallel with the room list, so a returning user waits no longer than before.
+let mapLoading: Promise<typeof import('./PlaceMap')> | undefined
+const loadMap = () =>
+  (mapLoading ??= new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${import.meta.env.VITE_NAVER_MAP_CLIENT_ID}`
+    s.onload = () => resolve()
+    s.onerror = () => reject(new Error('naver maps failed to load'))
+    document.head.appendChild(s)
+  })
+    .then(() => import('./PlaceMap'))
+    .catch((e) => {
+      mapLoading = undefined // let a later attempt retry
+      throw e
+    }))
+const PlaceMap = lazy(loadMap)
 
 const LAST_ROOM = 'twogether.room'
 const remembered = () => {
@@ -20,8 +37,12 @@ export default function App() {
   const [currentId, setCurrentId] = useState(remembered)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    const start = (s: Session | null) => {
+      if (s) loadMap().catch(() => {}) // a failure surfaces when PlaceMap renders
+      setSession(s)
+    }
+    supabase.auth.getSession().then(({ data }) => start(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => start(s))
     return () => data.subscription.unsubscribe()
   }, [])
 
@@ -67,14 +88,16 @@ export default function App() {
   const room = rooms.find((r) => r.id === currentId) ?? rooms[0]
   if (!room) return <RoomGate onRoom={joined} />
   return (
-    <PlaceMap
-      room={room}
-      rooms={rooms}
-      onSwitch={switchTo}
-      onRefresh={loadRooms}
-      onRoom={joined}
-      onRename={(name) => setRooms(rooms.map((r) => (r.id === room.id ? { ...r, name } : r)))}
-      onLeave={() => setRooms(rooms.filter((r) => r.id !== room.id))}
-    />
+    <Suspense fallback={null}>
+      <PlaceMap
+        room={room}
+        rooms={rooms}
+        onSwitch={switchTo}
+        onRefresh={loadRooms}
+        onRoom={joined}
+        onRename={(name) => setRooms(rooms.map((r) => (r.id === room.id ? { ...r, name } : r)))}
+        onLeave={() => setRooms(rooms.filter((r) => r.id !== room.id))}
+      />
+    </Suspense>
   )
 }

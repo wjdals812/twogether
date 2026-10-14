@@ -1,5 +1,7 @@
 # twogether
 
+[![CI](https://github.com/wjdals812/twogether/actions/workflows/ci.yml/badge.svg)](https://github.com/wjdals812/twogether/actions/workflows/ci.yml)
+
 함께 가고 싶은 장소를 모아 실시간으로 같이 채워 가는 지도 서비스입니다. 초대 코드로 같은 방에 들어온 사람끼리 장소를 추가하고, 가 본 곳인지 표시하고, 별점과 대화를 남깁니다. 한 사람이 바꾸면 다른 사람의 화면에도 바로 반영됩니다.
 
 **배포 주소:** https://twogether-three.vercel.app

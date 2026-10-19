@@ -37,6 +37,15 @@ const stamp = (iso: string) => {
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const isTemp =(p: Saved) => p.id.startsWith('tmp:')
 
+// the search endpoint spends the Kakao quota, so it only answers logged-in users
+async function searchApi(q: string, signal?: AbortSignal) {
+  const { data } = await supabase.auth.getSession()
+  return fetch(`/api/search?query=${encodeURIComponent(q)}`, {
+    signal,
+    headers: { authorization: `Bearer ${data.session?.access_token}` },
+  })
+}
+
 export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onRename, onLeave }: {
   room: Room
   rooms: Room[]
@@ -253,7 +262,7 @@ export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onR
     const ctrl = new AbortController()
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?query=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        const res = await searchApi(q, ctrl.signal)
         if (!res.ok) return setError(`검색 실패 (${res.status})`)
         setError('')
         const documents: Place[] = (await res.json()).documents
@@ -272,7 +281,7 @@ export default function PlaceMap({ room, rooms, onSwitch, onRefresh, onRoom, onR
   async function search(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`)
+    const res = await searchApi(query)
     if (!res.ok) return setError(`검색 실패 (${res.status})`)
     setResults((await res.json()).documents)
   }
